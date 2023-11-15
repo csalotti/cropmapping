@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "geowatch"
+version = "0.1.0"
+description = "Research repository for time series classification on geo data"
+authors = ["Christopher Salotti <christopher.salotti@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "~3.11"
+pytorch-lightning = "^2.1.1"
+transformers = "^4.35.0"
+pandas = "^2.1.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
