@@ -1,0 +1,36 @@
+from glob import glob
+from os.path import join
+import pandas as pd
+import re
+
+from pandas.io.parquet import json
+
+from utils.constants import CHUNK_ID_COL, POINT_ID_COL, DATE_COL, SIZE_COL, START_COL
+
+
+def chunks_indexing(chunks_root: str, write_csv: bool = False):
+    files = glob(join(chunks_root, "*.csv"))
+    indexes = []
+    for f in files:
+        chunk_df = pd.read_csv(f)
+        chunk_df = chunk_df.sort_values([POINT_ID_COL, DATE_COL]).reset_index(drop=True)
+        indexes_df = chunk_df[[POINT_ID_COL]].assign(id=chunk_df.index)
+        indexes_df = indexes_df.groupby(POINT_ID_COL).agg(["first", "last"])
+        indexes_df.columns = indexes_df.columns.map("_".join)
+        indexes_df = (
+            # fmt: off
+            indexes_df
+            .assign(chunk_id=int(re.findall(r"\d+", f)[0]))
+            .assign(size=lambda x: x["id_last"] - x["id_first"])
+            .rename(columns={"id_first" : START_COL})
+            # fmt: on
+        )
+        indexes.extend(
+            indexes_df.reset_index()[
+                [POINT_ID_COL, START_COL, SIZE_COL, CHUNK_ID_COL]
+            ].to_dict(orient="records")
+        )
+        chunk_df.to_csv(f, index=False)
+
+    with open(join(chunks_root, "indexes.json"), "w") as fw:
+        json.dump(indexes, fw)
