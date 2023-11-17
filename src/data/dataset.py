@@ -1,4 +1,5 @@
 from os.path import join
+from pprint import pformat
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -80,10 +81,12 @@ class ChunkDataset(IterableDataset):
         end_month: int = 12,
         n_steps: int = 3,
         standardize: bool = False,
+        shuffle: bool = True,
+        seed: int = 666,
     ):
         self.features_root = features_root
         self.labels_root = labels_root
-        self.indexes = iter(indexes.to_dict(orient="records"))
+        self.indexes = np.array(indexes.to_dict(orient="records"))
         self.label_to_class = {
             class_id: label_name
             for class_id, labels_names in CLASS_TO_LABEL.items()
@@ -99,6 +102,8 @@ class ChunkDataset(IterableDataset):
             + 1
         ) // n_steps
         self.standardize = standardize
+        self.shuffle = shuffle
+        self.generator = np.random.default_rng(seed=seed)
 
         logger.debug(f"Time Series sampled on {self.max_n_days} days")
 
@@ -121,55 +126,57 @@ class ChunkDataset(IterableDataset):
         return ts_padded, days_padded, mask
 
     def __iter__(self):
-        record_idx = next(self.indexes)
+        if self.shuffle:
+            self.generator.shuffle(self.indexes)
 
-        # Get single point time series data
-        records_features_df = (
-            pd.read_csv(
-                join(self.features_root, f"chunk_{record_idx[CHUNK_ID_COL]}.csv"),
-                skiprows=record_idx[START_COL],
-                iterator=True,
-            )
-            .get_chunk(record_idx[SIZE_COL])
-            .assign(**{DATE_COL: lambda x: pd.to_datetime(x[DATE_COL])})
-        )
+        for record_idx in self.indexes:
+            logger.debug(f"Record : {pformat(record_idx)}")
 
-        records_label_df = pd.read_csv(
-            join(self.labels_root, f"chunk_{record_idx[CHUNK_ID_COL]}.csv")
-        ).query(f"{POINT_ID_COL} == '{record_idx[POINT_ID_COL]}'")
-
-        # Produce single data bundle per season
-        for _, (season, label) in (
-            records_label_df[[SEASON_COL, LABEL_COL]].sample(frac=1).iterrows()
-        ):
-            logger.debug(f"Saison {season} - Label {label}")
-
-            season_features_df = records_features_df.query(
-                f"(({DATE_COL}.dt.year == {season - 1}) and ({DATE_COL}.dt.month >= {self.start_month})) "
-                + f" or (({DATE_COL}.dt.year == {season}) and ({DATE_COL}.dt.month < {self.end_month}))"
-            ).sort_values(DATE_COL)
-
-            days = season_features_df[DATE_COL].dt.dayofyear.values
-            ts = season_features_df[ALL_BANDS].values.astype(np.float32)
-            class_id = np.array([self.label_to_class.get(label, 0)])
-
-            ts, days, mask = self.transforms(ts, days)
-
-            logger.debug(
-                f"""
-                Shapes : 
-                    days    : {days.shape}
-                    mask    : {mask.shape}
-                    ts      : {ts.shape}
-                    class_id: {class_id.shape}
-                          """
+            # Get single point time series data
+            records_features_df = (
+                pd.read_csv(
+                    join(self.features_root, f"chunk_{record_idx[CHUNK_ID_COL]}.csv"),
+                    skiprows=range(1, record_idx[START_COL]),
+                    chunksize=self.max_n_days,
+                    usecols=[POINT_ID_COL, DATE_COL] + ALL_BANDS,
+                )
+                .get_chunk(record_idx[SIZE_COL])
+                .assign(**{DATE_COL: lambda x: pd.to_datetime(x[DATE_COL])})
             )
 
-            output = {
-                "days": days,
-                "mask": mask,
-                "ts": ts,
-                "class": class_id,
-            }
+            records_label_df = pd.read_csv(
+                join(self.labels_root, f"chunk_{record_idx[CHUNK_ID_COL]}.csv")
+            ).query(f"{POINT_ID_COL} == '{record_idx[POINT_ID_COL]}'")
 
-            yield {key: torch.from_numpy(value) for key, value in output.items()}
+            # Produce single data bundle per season
+            for _, (season, label) in (
+                records_label_df[[SEASON_COL, LABEL_COL]].sample(frac=1).iterrows()
+            ):
+                logger.debug(f"Saison {season} - Label {label}")
+
+                season_features_df = records_features_df.query(
+                    f"(({DATE_COL}.dt.year == {season - 1}) and ({DATE_COL}.dt.month >= {self.start_month})) "
+                    + f" or (({DATE_COL}.dt.year == {season}) and ({DATE_COL}.dt.month < {self.end_month}))"
+                ).sort_values(DATE_COL)
+
+                days = season_features_df[DATE_COL].dt.dayofyear.values
+                ts = season_features_df[ALL_BANDS].values.astype(np.float32)
+                class_id = np.array([self.label_to_class.get(label, 0)])
+
+                ts, days, mask = self.transforms(ts, days)
+
+                logger.debug(
+                    f"Shapes :\n\tdays\t: {days.shape}"
+                    + f"\n\tmask\t: {mask.shape}"
+                    + f"\n\tts\t: {ts.shape}"
+                    + f"\n\tclass_id: {class_id.shape}"
+                )
+
+                output = {
+                    "days": days,
+                    "mask": mask,
+                    "ts": ts,
+                    "class": class_id,
+                }
+
+                yield {key: torch.from_numpy(value) for key, value in output.items()}

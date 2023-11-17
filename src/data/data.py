@@ -40,11 +40,11 @@ class SITSDataModule(L.LightningDataModule):
                 features_root=features_root,
                 labels_root=labels_root,
                 indexes=indexes,
+                shuffle=False,
             )
 
     def train_dataloader(self):
-        shuffled_data = ShufflerIterDataPipe(self.train_dataset)
-        return DataLoader(shuffled_data, shuffle=True, batch_size=self.batch_size)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size)
 
     def val_dataloader(self):
         return DataLoader(self.eval_dataset, batch_size=self.batch_size)
