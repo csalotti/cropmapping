@@ -1,16 +1,8 @@
 import torch.nn as nn
 
 
-class CNN3DEncoding(nn.Module):
-    """
-    BERT Embedding which is consisted with under features
-        1. InputEmbedding : project the input to embedding size through a lightweight 3D-CNN
-        2. PositionalEncoding : adding positional information using sin/cos functions
-
-        sum of both features are output of BERTEmbedding
-    """
-
-    def __init__(self, channel_size=(32, 64, 256), kernel_size=(5, 1, 10, 1)):
+class PatchBandsEncoding(nn.Module):
+    def __init__(self, channel_size=(32, 64, 256), kernel_size=(5, 1, 5, 1)):
         super().__init__()
 
         self.conv1 = nn.Sequential(
@@ -47,8 +39,13 @@ class CNN3DEncoding(nn.Module):
         first_dim = batch_size * seq_length
 
         obs_embed = input_sequence.view(
-            first_dim, band_num, patch_size, patch_size
-        ).unsqueeze(1)
+            first_dim,
+            band_num,
+            patch_size,
+            patch_size,
+        ).unsqueeze(
+            1
+        )  # [B * T, 1, B, 1, 1]
         obs_embed = self.conv1(obs_embed)
         obs_embed = self.conv2(obs_embed)
         obs_embed = self.linear(

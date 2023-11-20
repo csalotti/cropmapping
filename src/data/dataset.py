@@ -1,23 +1,16 @@
+import logging
+from datetime import datetime
 from os.path import join
 from pprint import pformat
-import pandas as pd
-import numpy as np
-from pandas.io.parsers.readers import TextFileReader
-from datetime import datetime
-import torch
-from torch.utils.data import IterableDataset
-from utils.constants import (
-    ALL_BANDS,
-    CHUNK_ID_COL,
-    DATE_COL,
-    LABEL_COL,
-    POINT_ID_COL,
-    SEASON_COL,
-    SIZE_COL,
-    START_COL,
-)
 
-import logging
+import numpy as np
+import pandas as pd
+import torch
+from pandas.io.parsers.readers import TextFileReader
+from torch.utils.data import IterableDataset
+
+from utils.constants import (ALL_BANDS, CHUNK_ID_COL, DATE_COL, LABEL_COL,
+                             POINT_ID_COL, SEASON_COL, SIZE_COL, START_COL)
 
 CLASS_TO_LABEL = {
     1: ["AVH", "AVP"],  # avoine
@@ -104,23 +97,40 @@ class ChunkDataset(IterableDataset):
 
         logger.debug(f"Time Series sampled on {self.max_n_days} days")
 
-    def transforms(self, ts, days):
-        # Data standardization
+    def transforms(self, season_features_df: pd.DataFrame, season: int):
+        days = season_features_df[DATE_COL].copy()  # T
+        ts = season_features_df[ALL_BANDS].values.astype(np.float32)  # T, B
+
+        # Bands standardization
         if self.standardize:
             ts -= np.mean(ts, axis=0)
             ts /= np.std(ts, axis=0)
         else:
             ts /= 10_000
 
-        # Constant padding to fit fixed size
-        n_days = len(days)
-        ts_padded = np.pad(
-            ts, np.array([(self.max_n_days - n_days, 0), (0, 0)]), constant_values=-100
-        )
-        days_padded = np.pad(days, (self.max_n_days - n_days, 0), constant_values=-100)
-        mask = days_padded == -100
+        # Days normalizatioin to ref date
+        days_norm = (
+            days - datetime(year=season - 1, month=self.start_month, day=1)
+        ).dt.days
 
-        return ts_padded, days_padded, mask
+        # Constant padding to fit fixed size
+        n_days = len(days_norm)
+        ts_padded = np.pad(
+            ts,
+            np.array([(self.max_n_days - n_days, 0), (0, 0)]),
+            constant_values=0,
+        )
+        days_padded = np.pad(
+            days_norm,
+            (self.max_n_days - n_days, 0),
+            constant_values=0,
+        )
+        mask = np.array([False] * (self.max_n_days - n_days) + [True] * n_days)
+
+        # Add fourth and fifth dimension for conv
+        ts_expanded = np.expand_dims(np.expand_dims(ts_padded, axis=-1), axis=-1)
+
+        return ts_expanded, days_padded, mask
 
     def _read_chunk(self, chunk_id: int) -> TextFileReader:
         date_col_idx = (
@@ -167,11 +177,9 @@ class ChunkDataset(IterableDataset):
                     + f" or (({DATE_COL}.dt.year == {season}) and ({DATE_COL}.dt.month < {self.end_month}))"
                 ).sort_values(DATE_COL)
 
-                days = season_features_df[DATE_COL].dt.dayofyear.values
-                ts = season_features_df[ALL_BANDS].values.astype(np.float32)
-                class_id = np.array([self.label_to_class.get(label, 0)])
+                class_id = np.array([self.label_to_class.get(label, 0)])  # 1
 
-                ts, days, mask = self.transforms(ts, days)
+                ts, days, mask = self.transforms(season_features_df, season)
 
                 logger.debug(
                     f"Shapes :\n\tdays\t: {days.shape}"
