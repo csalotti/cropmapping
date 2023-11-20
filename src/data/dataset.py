@@ -2,6 +2,7 @@ from os.path import join
 from pprint import pformat
 import pandas as pd
 import numpy as np
+from pandas.io.parsers.readers import TextFileReader
 from datetime import datetime
 import torch
 from torch.utils.data import IterableDataset
@@ -81,12 +82,10 @@ class ChunkDataset(IterableDataset):
         end_month: int = 12,
         n_steps: int = 3,
         standardize: bool = False,
-        shuffle: bool = True,
-        seed: int = 666,
     ):
         self.features_root = features_root
         self.labels_root = labels_root
-        self.indexes = np.array(indexes.to_dict(orient="records"))
+        self.indexes = indexes.sort_values([CHUNK_ID_COL, START_COL])
         self.label_to_class = {
             class_id: label_name
             for class_id, labels_names in CLASS_TO_LABEL.items()
@@ -102,8 +101,6 @@ class ChunkDataset(IterableDataset):
             + 1
         ) // n_steps
         self.standardize = standardize
-        self.shuffle = shuffle
-        self.generator = np.random.default_rng(seed=seed)
 
         logger.debug(f"Time Series sampled on {self.max_n_days} days")
 
@@ -125,24 +122,35 @@ class ChunkDataset(IterableDataset):
 
         return ts_padded, days_padded, mask
 
-    def __iter__(self):
-        if self.shuffle:
-            self.generator.shuffle(self.indexes)
+    def _read_chunk(self, chunk_id: int) -> TextFileReader:
+        date_col_idx = (
+            open(join(self.features_root, f"chunk_{chunk_id}.csv"), "r")
+            .readline()
+            .split(",")
+            .index(DATE_COL)
+        )
+        chunk_it = pd.read_csv(
+            join(self.features_root, f"chunk_{chunk_id}.csv"),
+            iterator=True,
+            parse_dates=[date_col_idx],
+        )
+        return chunk_it
 
-        for record_idx in self.indexes:
+    def __iter__(self):
+        # Retrive CSV as chunked iterator
+        current_chunk_id = self.indexes.iloc[0][CHUNK_ID_COL]
+        chunk_reader = self._read_chunk(current_chunk_id)
+
+        # Iterate over records
+        for record_idx in self.indexes.to_dict(orient="records"):
             logger.debug(f"Record : {pformat(record_idx)}")
 
+            if record_idx[CHUNK_ID_COL] != current_chunk_id:
+                current_chunk_id = record_idx[CHUNK_ID_COL]
+                chunk_reader = self._read_chunk(current_chunk_id)
+
             # Get single point time series data
-            records_features_df = (
-                pd.read_csv(
-                    join(self.features_root, f"chunk_{record_idx[CHUNK_ID_COL]}.csv"),
-                    skiprows=range(1, record_idx[START_COL]),
-                    chunksize=self.max_n_days,
-                    usecols=[POINT_ID_COL, DATE_COL] + ALL_BANDS,
-                )
-                .get_chunk(record_idx[SIZE_COL])
-                .assign(**{DATE_COL: lambda x: pd.to_datetime(x[DATE_COL])})
-            )
+            records_features_df = chunk_reader.get_chunk(record_idx[SIZE_COL])
 
             records_label_df = pd.read_csv(
                 join(self.labels_root, f"chunk_{record_idx[CHUNK_ID_COL]}.csv")

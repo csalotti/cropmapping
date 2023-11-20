@@ -1,7 +1,7 @@
 import logging
 from pprint import pprint
 from time import time
-from data import SITSDataModule
+from data.modules import SITSDataModule
 
 DATA_ROOT = "data"
 logging.basicConfig(level=logging.INFO)
@@ -21,6 +21,9 @@ def main():
     iter_train = iter(train_loader)
     iter_val = iter(val_loader)
 
+    start = time()
+    pprint({k: v.shape for k, v in next(iter_train).items()})
+    print(f"Train Elapsed time : {time() - start}")
     start = time()
     pprint({k: v.shape for k, v in next(iter_train).items()})
     print(f"Train Elapsed time : {time() - start}")
