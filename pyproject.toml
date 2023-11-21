@@ -6,13 +6,14 @@ authors = ["Christopher Salotti <christopher.salotti@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "~3.9"
+python = "~3.10"
 pytorch-lightning = "^2.1.1"
 transformers = "^4.35.0"
 pandas = "^2.1.3"
 pyarrow = "^14.0.1"
 jsonargparse = {extras = ["signatures"], version = "^4.27.0"}
 lightning = {extras = ["extra"], version = "^2.1.2"}
+tensorboard = "^2.15.1"
 
 
 [tool.poetry.group.dev.dependencies]

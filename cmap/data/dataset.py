@@ -60,8 +60,7 @@ CLASS_TO_LABEL = {
     19: ["TTH", "TTP"],  # triticale
 }
 
-logger = logging.getLogger(__name__)
-
+logger = logging.getLogger("lightning.pytorch.data.ChunkDataset")
 REFERENCE_YEAR = 2023
 
 
@@ -195,4 +194,10 @@ class ChunkDataset(IterableDataset):
                     "class": class_id,
                 }
 
-                yield {key: torch.from_numpy(value) for key, value in output.items()}
+                logger.debug(output)
+
+                tensor_output = {key: torch.from_numpy(value) for key, value in output.items()}
+                
+                logger.debug(tensor_output)
+
+                yield tensor_output

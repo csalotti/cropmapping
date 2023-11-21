@@ -14,6 +14,7 @@ def chunks_indexing(chunks_root: str, write_csv: bool = False):
     indexes = []
     for f in files:
         chunk_df = pd.read_csv(f)
+        chunk_id = chunk_df[CHUNK_ID_COL].unique()[0]
         chunk_df = (
             chunk_df.sort_values([POINT_ID_COL, DATE_COL])
             .reset_index(drop=True)
@@ -25,7 +26,7 @@ def chunks_indexing(chunks_root: str, write_csv: bool = False):
         indexes_df = (
             # fmt: off
             indexes_df
-            .assign(chunk_id=int(re.findall(r"\d+", f)[0]))
+            .assign(chunk_id=chunk_id)
             .assign(size=lambda x: x["id_last"] - x["id_first"])
             .rename(columns={"id_first" : START_COL})
             # fmt: on

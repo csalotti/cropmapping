@@ -1,5 +1,9 @@
+import logging
+
+import torch
 import torch.nn as nn
 
+logger = logging.getLogger("lightning.pytorch.ml.embeddings.bands")
 
 class PatchBandsEncoding(nn.Module):
     def __init__(self, channel_size=(32, 64, 256), kernel_size=(5, 1, 5, 1)):
@@ -45,7 +49,7 @@ class PatchBandsEncoding(nn.Module):
             patch_size,
         ).unsqueeze(
             1
-        )  # [B * T, 1, B, 1, 1]
+        )# [B * T, 1, B, 1, 1]
         obs_embed = self.conv1(obs_embed)
         obs_embed = self.conv2(obs_embed)
         obs_embed = self.linear(
