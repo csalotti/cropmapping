@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from os.path import join
 from pprint import pformat
+from lightning_utilities.core.imports import P
 
 import numpy as np
 import pandas as pd
@@ -70,6 +71,7 @@ CLASS_TO_LABEL = {
 
 logger = logging.getLogger("lightning.pytorch.data.ChunkDataset")
 REFERENCE_YEAR = 2023
+MIN_DAYS = 3
 
 
 class ChunkDataset(IterableDataset):
@@ -82,6 +84,7 @@ class ChunkDataset(IterableDataset):
         end_month: int = 12,
         n_steps: int = 3,
         standardize: bool = False,
+        max_records: int = -1,
     ):
         self.features_root = features_root
         self.labels_root = labels_root
@@ -101,6 +104,7 @@ class ChunkDataset(IterableDataset):
             + 1
         ) // n_steps
         self.standardize = standardize
+        self.max_records = max_records
 
         logger.debug(f"Time Series sampled on {self.max_n_days} days")
 
@@ -159,6 +163,7 @@ class ChunkDataset(IterableDataset):
         current_chunk_id = self.indexes.iloc[0][CHUNK_ID_COL]
         chunk_reader = self._read_chunk(current_chunk_id)
 
+        # Split data among workers
         sub_indexes_df = (
             self.indexes.query(
                 f"{CHUNK_ID_COL} % {worker_info.num_workers} == {worker_info.id}"
@@ -166,16 +171,37 @@ class ChunkDataset(IterableDataset):
             if worker_info.num_workers > 1
             else self.indexes
         )
+
+        # Limit number of samples per wokers if flagged
+        max_records = (
+            self.max_records // worker_info.num_workers
+            if self.max_records > 0
+            else float("inf")
+        )
+
         # Iterate over records
-        for record_idx in sub_indexes_df.to_dict(orient="records"):
+        for i, record_idx in enumerate(sub_indexes_df.to_dict(orient="records")):
+            if i >= max_records:
+                break
+
             logger.debug(f"Record : {pformat(record_idx)}")
 
+            # Invalid record
+            if record_idx[SIZE_COL] <= MIN_DAYS:
+                continue
+
+            # Change record file
             if record_idx[CHUNK_ID_COL] != current_chunk_id:
                 current_chunk_id = record_idx[CHUNK_ID_COL]
                 chunk_reader = self._read_chunk(current_chunk_id)
 
             # Get single point time series data
-            records_features_df = chunk_reader.get_chunk(record_idx[SIZE_COL])
+            records_features_df = chunk_reader.get_chunk(record_idx[SIZE_COL] + 1)
+
+            if len(records_features_df[POINT_ID_COL].unique()) > 1:
+                raise ValueError(
+                    f"Chunk size {record_idx[SIZE_COL]} sampled two points {records_features_df[POINT_ID_COL].unique()}"
+                )
 
             records_label_df = pd.read_csv(
                 join(self.labels_root, f"chunk_{record_idx[CHUNK_ID_COL]}.csv")
