@@ -19,6 +19,7 @@ class SITSDataModule(L.LightningDataModule):
         batch_size: int = 32,
         prepare: bool = False,
         num_workers: int = 3,
+        max_records: int = -1,
     ):
         L.LightningDataModule.__init__(self)
 
@@ -27,6 +28,7 @@ class SITSDataModule(L.LightningDataModule):
         self.batch_size = batch_size
         self.prepare = prepare
         self.num_workers = num_workers
+        self.max_records = max_records
 
     def prepare_data(self) -> None:
         if self.prepare:
@@ -41,6 +43,7 @@ class SITSDataModule(L.LightningDataModule):
             features_root=features_root,
             labels_root=labels_root,
             indexes=indexes,
+            max_records=self.max_records,
         )
 
         features_root = join(self.eval_root, "features")

@@ -1,11 +1,12 @@
 from typing import List
+from lightning_utilities.core.imports import P
 
 import pytorch_lightning as L
 import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR, LinearLR, SequentialLR
-from torchmetrics.classification import F1Score
+from torchmetrics.classification import ConfusionMatrix, F1Score
 
 from ml.embeddings.bands import PatchBandsEncoding
 from ml.embeddings.position import PositionalEncoding
@@ -57,11 +58,15 @@ class SITSFormerModule(L.LightningModule):
         self.wd = wd
         self.decay_max_epoch = decay_max_epoch
 
+        # data
+        self.validation_outputs = []
+
         # layers and model
         band_emb_kernel_size[2] = n_bands - 4
 
         self.criterion = FocalLoss(gamma=1)
         self.scorer = F1Score(task="multiclass", num_classes=n_classes)
+        self.conf_mat = ConfusionMatrix(task="multiclass", num_classes=n_classes)
 
         self._create_model()
 
@@ -110,7 +115,11 @@ class SITSFormerModule(L.LightningModule):
         f1_score = self.scorer(y_hat_cls, y)
         self.log("train_loss", loss)
         self.log("train_f1_score", f1_score)
-        return loss
+        return {
+            "loss": loss,
+            "preds": y_hat,
+            "targets": y,
+        }
 
     def validation_step(self, batch, batch_idx):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
@@ -121,6 +130,16 @@ class SITSFormerModule(L.LightningModule):
         f1_score = self.scorer(y_hat_cls, y)
         self.log("val_loss", loss)
         self.log("val_f1_score", f1_score)
+        self.conf_mat.update(y_hat, y)
+
+    def on_validation_epoch_end(self):
+        fig_, _ = self.conf_mat.plot()
+
+        self.logger.experiment.add_figure(
+            "Validation Confusion matrix", fig_, self.current_epoch
+        )
+
+        self.validation_outputs.clear()
 
     def configure_optimizers(self):
         optimizer = Adam(
