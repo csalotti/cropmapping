@@ -11,6 +11,7 @@ from utils.chunk import chunks_indexing
 
 logger = logging.getLogger("lightning.pytorch.core")
 
+
 class SITSDataModule(L.LightningDataModule):
     def __init__(
         self,

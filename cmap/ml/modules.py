@@ -33,9 +33,23 @@ class SITSFormerModule(L.LightningModule):
         wd: float = 1e-4,
         decay_max_epoch: int = 50,
     ):
-        L.LightningModule.__init__(self)
+        super().__init__()
 
-        # hyper parameters
+        # Features
+        self.max_n_days = max_n_days
+        self.n_bands = n_bands
+        self.n_classes = n_classes
+
+        # Embedding
+        self.d_model = d_model
+        self.band_emb_chanels = band_emb_chanels
+        self.band_emb_kernel_size = band_emb_kernel_size
+        self.att_hidden_size = att_hidden_size
+        self.n_att_head = n_att_head
+        self.n_att_layers = n_att_layers
+        self.dropout_p = dropout_p
+
+        # Optimizationin
         self.min_lr = min_lr
         self.max_lr = max_lr
         self.gamma = gamma
@@ -46,28 +60,39 @@ class SITSFormerModule(L.LightningModule):
         # layers and model
         band_emb_kernel_size[2] = n_bands - 4
 
-        position_encoder = PositionalEncoding(d_model=d_model, max_len=max_n_days)
+        self.criterion = FocalLoss(gamma=1)
+        self.scorer = F1Score(task="multiclass", num_classes=n_classes)
+
+        self._create_model()
+
+    def _create_model(self):
+        position_encoder = PositionalEncoding(
+            d_model=self.d_model, max_len=self.max_n_days
+        )
         bands_encoder = PatchBandsEncoding(
-            channel_size=band_emb_chanels + [d_model],
-            kernel_size=band_emb_kernel_size,
+            channel_size=self.band_emb_chanels + [self.d_model],
+            kernel_size=self.band_emb_kernel_size,
         )
 
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model,
-            nhead=n_att_head,
-            dim_feedforward=att_hidden_size * 4,
-            dropout=dropout_p,
+            d_model=self.d_model,
+            nhead=self.n_att_head,
+            dim_feedforward=self.att_hidden_size * 4,
+            dropout=self.dropout_p,
             batch_first=True,
         )
-        encoder_norm = nn.LayerNorm(att_hidden_size)
+        encoder_norm = nn.LayerNorm(self.att_hidden_size)
 
         transformer_encoder = nn.TransformerEncoder(
             encoder_layer=encoder_layer,
-            num_layers=n_att_layers,
+            num_layers=self.n_att_layers,
             norm=encoder_norm,
         )
 
-        clf_head = MulticlassClassification(att_hidden_size, n_classes)
+        clf_head = MulticlassClassification(
+            self.att_hidden_size,
+            self.n_classes,
+        )
 
         self.classifier = SITSFormerClassifier(
             position_encoder,
@@ -75,9 +100,6 @@ class SITSFormerModule(L.LightningModule):
             transformer_encoder,
             clf_head,
         )
-
-        self.criterion = FocalLoss(gamma=1)
-        self.scorer = F1Score(task="multiclass", num_classes=n_classes)
 
     def training_step(self, batch, batch_idx):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
@@ -107,7 +129,9 @@ class SITSFormerModule(L.LightningModule):
             weight_decay=self.wd,
         )
         warmup_lr_scheduler = LinearLR(
-            optimizer, start_factor=self.min_lr/self.max_lr, total_iters=self.warmup_epochs
+            optimizer,
+            start_factor=self.min_lr / self.max_lr,
+            total_iters=self.warmup_epochs,
         )
         decreasing_scheduler = ExponentialLR(
             optimizer=optimizer,

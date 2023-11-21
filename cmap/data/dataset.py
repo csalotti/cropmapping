@@ -9,8 +9,16 @@ import torch
 from pandas.io.parsers.readers import TextFileReader
 from torch.utils.data import IterableDataset
 
-from utils.constants import (ALL_BANDS, CHUNK_ID_COL, DATE_COL, LABEL_COL,
-                             POINT_ID_COL, SEASON_COL, SIZE_COL, START_COL)
+from utils.constants import (
+    ALL_BANDS,
+    CHUNK_ID_COL,
+    DATE_COL,
+    LABEL_COL,
+    POINT_ID_COL,
+    SEASON_COL,
+    SIZE_COL,
+    START_COL,
+)
 
 CLASS_TO_LABEL = {
     1: ["AVH", "AVP"],  # avoine
@@ -61,7 +69,6 @@ CLASS_TO_LABEL = {
 }
 
 logger = logging.getLogger("lightning.pytorch.data.ChunkDataset")
-logger.addHandler(logging.FileHandler("dataset.log"))
 REFERENCE_YEAR = 2023
 
 
@@ -80,7 +87,7 @@ class ChunkDataset(IterableDataset):
         self.labels_root = labels_root
         self.indexes = indexes.sort_values([CHUNK_ID_COL, START_COL])
         self.label_to_class = {
-                label_name : class_id
+            label_name: class_id
             for class_id, labels_names in CLASS_TO_LABEL.items()
             for label_name in labels_names
         }
@@ -148,11 +155,19 @@ class ChunkDataset(IterableDataset):
 
     def __iter__(self):
         # Retrive CSV as chunked iterator
+        worker_info = torch.utils.data.get_worker_info()
         current_chunk_id = self.indexes.iloc[0][CHUNK_ID_COL]
         chunk_reader = self._read_chunk(current_chunk_id)
 
+        sub_indexes_df = (
+            self.indexes.query(
+                f"{CHUNK_ID_COL} % {worker_info.num_workers} == {worker_info.id}"
+            )
+            if worker_info.num_workers > 1
+            else self.indexes
+        )
         # Iterate over records
-        for record_idx in self.indexes.to_dict(orient="records"):
+        for record_idx in sub_indexes_df.to_dict(orient="records"):
             logger.debug(f"Record : {pformat(record_idx)}")
 
             if record_idx[CHUNK_ID_COL] != current_chunk_id:
@@ -197,6 +212,8 @@ class ChunkDataset(IterableDataset):
 
                 logger.debug(output)
 
-                tensor_output = {key: torch.from_numpy(value) for key, value in output.items()}
-                
+                tensor_output = {
+                    key: torch.from_numpy(value) for key, value in output.items()
+                }
+
                 yield tensor_output
