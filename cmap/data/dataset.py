@@ -61,6 +61,7 @@ CLASS_TO_LABEL = {
 }
 
 logger = logging.getLogger("lightning.pytorch.data.ChunkDataset")
+logger.addHandler(logging.FileHandler("dataset.log"))
 REFERENCE_YEAR = 2023
 
 
@@ -79,7 +80,7 @@ class ChunkDataset(IterableDataset):
         self.labels_root = labels_root
         self.indexes = indexes.sort_values([CHUNK_ID_COL, START_COL])
         self.label_to_class = {
-            class_id: label_name
+                label_name : class_id
             for class_id, labels_names in CLASS_TO_LABEL.items()
             for label_name in labels_names
         }
@@ -198,6 +199,4 @@ class ChunkDataset(IterableDataset):
 
                 tensor_output = {key: torch.from_numpy(value) for key, value in output.items()}
                 
-                logger.debug(tensor_output)
-
                 yield tensor_output

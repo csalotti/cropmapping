@@ -61,7 +61,6 @@ class SITSDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             persistent_workers=True,
-            prefetch_factor=self.batch_size//self.num_workers,
             shuffle=True,
         )
 
@@ -71,5 +70,4 @@ class SITSDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             persistent_workers=True,
-            prefetch_factor=self.batch_size//self.num_workers,
         )
