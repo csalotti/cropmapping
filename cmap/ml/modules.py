@@ -107,7 +107,7 @@ class SITSFormerModule(L.LightningModule):
             weight_decay=self.wd,
         )
         warmup_lr_scheduler = LinearLR(
-            optimizer, self.min_lr, self.max_lr, self.warmup_epochs
+            optimizer, start_factor=self.min_lr/self.max_lr, total_iters=self.warmup_epochs
         )
         decreasing_scheduler = ExponentialLR(
             optimizer=optimizer,
