@@ -1,11 +1,10 @@
-from typing import Any, List, Optional
+from typing import List
 
 import pytorch_lightning as L
 import torch
 import torch.nn as nn
-from pytorch_lightning.utilities.types import LRSchedulerTypeUnion
 from torch.optim import Adam
-from torch.optim.lr_scheduler import ConstantLR, ExponentialLR, SequentialLR
+from torch.optim.lr_scheduler import ExponentialLR, LinearLR, SequentialLR
 from torchmetrics.classification import F1Score
 
 from ml.embeddings.bands import PatchBandsEncoding
@@ -27,7 +26,8 @@ class SITSFormerModule(L.LightningModule):
         n_att_head: int = 8,
         n_att_layers: int = 3,
         dropout_p: float = 0.1,
-        lr: float = 1e4,
+        min_lr: float = 1e6,
+        max_lr: float = 1e4,
         gamma: float = 0.99,
         warmup_epochs: int = 10,
         wd: float = 1e-4,
@@ -36,7 +36,8 @@ class SITSFormerModule(L.LightningModule):
         L.LightningModule.__init__(self)
 
         # hyper parameters
-        self.lr = lr
+        self.min_lr = min_lr
+        self.max_lr = max_lr
         self.gamma = gamma
         self.warmup_epochs = warmup_epochs
         self.wd = wd
@@ -102,13 +103,11 @@ class SITSFormerModule(L.LightningModule):
     def configure_optimizers(self):
         optimizer = Adam(
             self.classifier.parameters(),
-            lr=self.lr,
+            lr=self.max_lr,
             weight_decay=self.wd,
         )
-        warmup_lr_scheduler = ConstantLR(
-            optimizer,
-            factor=1.0,
-            total_iters=self.warmup_epochs,
+        warmup_lr_scheduler = LinearLR(
+            optimizer, self.min_lr, self.max_lr, self.warmup_epochs
         )
         decreasing_scheduler = ExponentialLR(
             optimizer=optimizer,
