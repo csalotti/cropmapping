@@ -1,3 +1,4 @@
+import logging
 from typing import List
 from lightning_utilities.core.imports import P
 
@@ -13,6 +14,9 @@ from ml.embeddings.position import PositionalEncoding
 from ml.losses import FocalLoss
 from ml.models import MulticlassClassification, SITSFormerClassifier
 
+
+logger = logging.getLogger(__name__)
+#logger.addHandler(logging.FileHandler("ml.modules.log"))
 
 class SITSFormerModule(L.LightningModule):
     def __init__(
@@ -123,6 +127,8 @@ class SITSFormerModule(L.LightningModule):
         }
 
     def validation_step(self, batch, batch_idx):
+        logger.debug("Validation")
+        1
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
         y_hat = self.classifier(ts, days, mask)
         y = y.squeeze()

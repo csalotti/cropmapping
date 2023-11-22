@@ -12,8 +12,8 @@ from utils.constants import LABEL_COL, POINT_ID_COL, SEASON_COL
 from data.dataset import ChunkDataset, CLASSES
 from utils.chunk import chunks_indexing
 
-logger = logging.getLogger("lightning.pytorch.core")
-# logger.addHandler(logging.FileHandler("datamodule.log"))
+logger = logging.getLogger("lightning.pytorch.datamodule")
+#logger.addHandler(logging.FileHandler("datamodule.log"))
 
 
 class SITSDataModule(L.LightningDataModule):
@@ -107,7 +107,7 @@ class SITSDataModule(L.LightningDataModule):
         )
 
     def val_dataloader(self):
-        return DataLoader(
+        dl = DataLoader(
             self.val_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
@@ -115,3 +115,6 @@ class SITSDataModule(L.LightningDataModule):
             drop_last=True,
             pin_memory=self.trainer.num_devices > 0,
         )
+        logger.debug("Val Dataloader")
+        logger.debug(next(iter(dl)))
+        return dl
