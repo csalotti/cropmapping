@@ -69,6 +69,7 @@ CLASS_TO_LABEL = {
 }
 
 logger = logging.getLogger("lightning.pytorch.data.ChunkDataset")
+# logger.addHandler(logging.FileHandler("dataset.log"))
 REFERENCE_YEAR = 2023
 MIN_DAYS = 3
 
@@ -155,6 +156,9 @@ class ChunkDataset(IterableDataset):
             parse_dates=[date_col_idx],
         )
         return chunk_it
+
+    def __len__(self):
+        return len(self.labels)
 
     def __iter__(self):
         # Workers infos
