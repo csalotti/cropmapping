@@ -13,7 +13,7 @@ from data.dataset import ChunkDataset, CLASSES
 from utils.chunk import chunks_indexing
 
 logger = logging.getLogger("lightning.pytorch.core")
-
+#logger.addHandler(logging.FileHandler("datamodule.log"))
 
 class SITSDataModule(L.LightningDataModule):
     def __init__(
@@ -69,6 +69,7 @@ class SITSDataModule(L.LightningDataModule):
         return indexes, labels
 
     def setup(self, stage: str):
+        logger.debug(f"Stage {stage}")
         # Train
         train_features_root = join(self.train_root, "features")
         train_indexes, train_labels = self.__retrieve(self.train_root)
@@ -101,6 +102,7 @@ class SITSDataModule(L.LightningDataModule):
             persistent_workers=True,
             shuffle=True,
             drop_last=True,
+            pin_memory=self.trainer.on_gpu,
         )
 
     def val_dataloader(self):
@@ -110,4 +112,5 @@ class SITSDataModule(L.LightningDataModule):
             num_workers=self.num_workers,
             persistent_workers=True,
             drop_last=True,
+            pin_memory=self.trainer.on_gpu,
         )
