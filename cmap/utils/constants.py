@@ -8,6 +8,8 @@ LABEL_COL = "label"
 START_COL = "start"
 SIZE_COL = "size"
 CHUNK_ID_COL = "chunk_id"
+SEASON_COL = "season"
+
 
 # Bands
 BAND_2_COL = "R20m_B02"

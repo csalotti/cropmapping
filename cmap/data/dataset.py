@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 from os.path import join
 from pprint import pformat
-from lightning_utilities.core.imports import P
 
 import numpy as np
 import pandas as pd
@@ -78,7 +77,7 @@ class ChunkDataset(IterableDataset):
     def __init__(
         self,
         features_root: str,
-        labels_root: str,
+        labels: pd.DataFrame,
         indexes: pd.DataFrame,
         start_month: int = 11,
         end_month: int = 12,
@@ -87,7 +86,7 @@ class ChunkDataset(IterableDataset):
         max_records: int = -1,
     ):
         self.features_root = features_root
-        self.labels_root = labels_root
+        self.labels = labels
         self.indexes = indexes.sort_values([CHUNK_ID_COL, START_COL])
         self.label_to_class = {
             label_name: class_id
@@ -158,10 +157,13 @@ class ChunkDataset(IterableDataset):
         return chunk_it
 
     def __iter__(self):
-        # Retrive CSV as chunked iterator
+        # Workers infos
         worker_info = torch.utils.data.get_worker_info()
         current_chunk_id = self.indexes.iloc[0][CHUNK_ID_COL]
+
+        # Retrive CSV as chunked iterator
         chunk_reader = self._read_chunk(current_chunk_id)
+        cur_row = 0
 
         # Split data among workers
         sub_indexes_df = (
@@ -172,41 +174,41 @@ class ChunkDataset(IterableDataset):
             else self.indexes
         )
 
-        # Limit number of samples per wokers if flagged
-        max_records = (
-            self.max_records // worker_info.num_workers
-            if self.max_records > 0
-            else float("inf")
-        )
+        sub_labels_df = self.labels[
+            self.labels[POINT_ID_COL].isin(sub_indexes_df[POINT_ID_COL])
+        ]
 
         # Iterate over records
-        for i, record_idx in enumerate(sub_indexes_df.to_dict(orient="records")):
-            if i >= max_records:
-                break
-
+        for record_idx in sub_indexes_df.to_dict(orient="records"):
             logger.debug(f"Record : {pformat(record_idx)}")
-
-
+            logger.debug(f"Last row id {cur_row}")
             # Change record file
             if record_idx[CHUNK_ID_COL] != current_chunk_id:
                 current_chunk_id = record_idx[CHUNK_ID_COL]
                 chunk_reader = self._read_chunk(current_chunk_id)
+                cur_row = 0
 
             # Get single point time series data
-            records_features_df = chunk_reader.get_chunk(record_idx[SIZE_COL] + 1)
-            
+            record_start_row = record_idx[START_COL]
+            chunk_size = record_idx[SIZE_COL]
+            if record_start_row != cur_row:
+                chunk_reader.get_chunk(record_start_row - cur_row)
+
+            records_features_df = chunk_reader.get_chunk(chunk_size + 1)
+            cur_row = record_start_row + chunk_size + 1
+
             # Invalid record
             if record_idx[SIZE_COL] <= MIN_DAYS:
                 continue
 
             if len(records_features_df[POINT_ID_COL].unique()) > 1:
                 raise ValueError(
-                    f"Chunk size {record_idx[SIZE_COL]} sampled two points {records_features_df[POINT_ID_COL].unique()}"
+                    f"Chunk size {record_idx[SIZE_COL]} sampled two points {records_features_df[POINT_ID_COL].unique()}\n{records_features_df}"
                 )
 
-            records_label_df = pd.read_csv(
-                join(self.labels_root, f"chunk_{record_idx[CHUNK_ID_COL]}.csv")
-            ).query(f"{POINT_ID_COL} == '{record_idx[POINT_ID_COL]}'")
+            records_label_df = sub_labels_df.query(
+                f"{POINT_ID_COL} == '{record_idx[POINT_ID_COL]}'"
+            )
 
             # Produce single data bundle per season
             for _, (season, label) in (
