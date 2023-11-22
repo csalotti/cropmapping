@@ -68,6 +68,7 @@ class SITSFormerModule(L.LightningModule):
         self.scorer = F1Score(task="multiclass", num_classes=n_classes)
         self.conf_mat = ConfusionMatrix(task="multiclass", num_classes=n_classes)
 
+        self.save_hyperparameters()
         self._create_model()
 
     def _create_model(self):

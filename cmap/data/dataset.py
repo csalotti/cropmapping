@@ -186,9 +186,6 @@ class ChunkDataset(IterableDataset):
 
             logger.debug(f"Record : {pformat(record_idx)}")
 
-            # Invalid record
-            if record_idx[SIZE_COL] <= MIN_DAYS:
-                continue
 
             # Change record file
             if record_idx[CHUNK_ID_COL] != current_chunk_id:
@@ -197,6 +194,10 @@ class ChunkDataset(IterableDataset):
 
             # Get single point time series data
             records_features_df = chunk_reader.get_chunk(record_idx[SIZE_COL] + 1)
+            
+            # Invalid record
+            if record_idx[SIZE_COL] <= MIN_DAYS:
+                continue
 
             if len(records_features_df[POINT_ID_COL].unique()) > 1:
                 raise ValueError(
