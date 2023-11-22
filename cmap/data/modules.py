@@ -6,9 +6,10 @@ import pandas as pd
 import pytorch_lightning as L
 from torch.utils.data import DataLoader
 from torch.utils.data.datapipes.iter.combinatorics import ShufflerIterDataPipe
-from utils.constants import LABEL_COL, POINT_ID_COL, SEASON_COL
+import yaml
 
-from data.dataset import ChunkDataset
+from utils.constants import LABEL_COL, POINT_ID_COL, SEASON_COL
+from data.dataset import ChunkDataset, CLASSES
 from utils.chunk import chunks_indexing
 
 logger = logging.getLogger("lightning.pytorch.core")
@@ -18,6 +19,7 @@ class SITSDataModule(L.LightningDataModule):
     def __init__(
         self,
         data_root: str,
+        classes_config: str = "configs/rpg_codes.yml",
         batch_size: int = 32,
         prepare: bool = False,
         num_workers: int = 3,
@@ -27,12 +29,17 @@ class SITSDataModule(L.LightningDataModule):
 
         self.train_root = join(data_root, "train")
         self.val_root = join(data_root, "eval")
+        self.classes_config = classes_config
         self.batch_size = batch_size
         self.prepare = prepare
         self.num_workers = num_workers
         self.records_frac = records_frac
 
     def prepare_data(self) -> None:
+        with open(self.classes_config, "r") as f:
+            class_to_label = yaml.safe_load(f)
+            self.label_to_class = {v: k for k, vs in class_to_label.items() for v in vs}
+
         if self.prepare:
             chunks_indexing(join(self.train_root, "features"), write_csv=True)
             chunks_indexing(join(self.val_root, "features"), write_csv=True)
@@ -42,10 +49,17 @@ class SITSDataModule(L.LightningDataModule):
         labels_root = join(root, "labels")
 
         indexes = pd.read_json(join(features_root, "indexes.json"))
+
+        # Select subset of available classes
         labels = pd.concat(
             [pd.read_csv(f, index_col=0) for f in glob(join(labels_root, "*.csv"))]
         )
+        labels[LABEL_COL] = labels[LABEL_COL].map(
+            lambda x: self.label_to_class.get(x, "other")
+        )
+        labels = labels.query(f"{LABEL_COL} in {CLASSES}")
 
+        # Subsample dataset respecting distribution of classes
         if self.records_frac < 1.0:
             labels = labels.groupby([LABEL_COL, SEASON_COL], group_keys=False).apply(
                 lambda x: x.sample(frac=self.records_frac)
@@ -62,6 +76,7 @@ class SITSDataModule(L.LightningDataModule):
             features_root=train_features_root,
             labels=train_labels,
             indexes=train_indexes,
+            label_to_class=self.label_to_class,
         )
 
         # Val
@@ -71,6 +86,7 @@ class SITSDataModule(L.LightningDataModule):
             features_root=val_features_root,
             labels=val_labels,
             indexes=val_indexes,
+            label_to_class=self.label_to_class,
         )
 
     def train_dataloader(self):

@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from os.path import join
 from pprint import pformat
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -20,58 +21,21 @@ from utils.constants import (
     START_COL,
 )
 
-CLASS_TO_LABEL = {
-    1: ["AVH", "AVP"],  # avoine
-    2: ["BTH", "BTP"],  # ble_tendre
-    3: ["BDH", "BDP", "BDT"],  # ble_dur
-    4: ["BTN", "BVF"],  # betterave
-    5: ["CZH", "CZP"],  # colza
-    6: ["FVL", "FVT", "FFO", "FF5", "FF6", "FF7", "DFV"],  # feveroles
-    7: ["HAR"],  # haricots
-    8: ["LEC", "DLL", "LEF"],  # lentilles
-    9: ["LIH", "LIP", "LIF", "DLN"],  # lin
-    10: [
-        "LDP",
-        "LDT",
-        "LDH",
-        "LFH",
-        "LFP",
-        "LH5",
-        "LH6",
-        "LH7",
-        "LP5",
-        "LP6",
-        "LP7N",
-        "DLP",
-    ],  # lupin
-    11: ["MID", "MIE", "MIS"],  # mais
-    12: ["MLT", "DML"],  # millet
-    13: ["ORH", "ORP"],  # orge
-    14: [
-        "PHI",
-        "PPR",
-        "PPT",
-        "PFH",
-        "PFP",
-        "PH5",
-        "PH6",
-        "PH7",
-        "PP5",
-        "PP6",
-        "PP7",
-        "DPS",
-    ],  # pois
-    15: ["SGH", "SGP", "DSG"],  # seigle
-    16: ["SOJ", "DSJ"],  # soja
-    17: ["SOG", "DSF"],  # sorgho
-    18: ["TRN", "DTN"],  # tournesol
-    19: ["TTH", "TTP"],  # triticale
-}
 
 logger = logging.getLogger("lightning.pytorch.data.ChunkDataset")
 # logger.addHandler(logging.FileHandler("dataset.log"))
 REFERENCE_YEAR = 2023
 MIN_DAYS = 3
+
+CLASSES = (
+    "other",
+    "ble_dur",
+    "ble_tendre",
+    "orge",
+    "colza",
+    "mais",
+    "tournesol",
+)
 
 
 class ChunkDataset(IterableDataset):
@@ -80,6 +44,7 @@ class ChunkDataset(IterableDataset):
         features_root: str,
         labels: pd.DataFrame,
         indexes: pd.DataFrame,
+        label_to_class: Dict[str, int],
         start_month: int = 11,
         end_month: int = 12,
         n_steps: int = 3,
@@ -89,11 +54,7 @@ class ChunkDataset(IterableDataset):
         self.features_root = features_root
         self.labels = labels
         self.indexes = indexes.sort_values([CHUNK_ID_COL, START_COL])
-        self.label_to_class = {
-            label_name: class_id
-            for class_id, labels_names in CLASS_TO_LABEL.items()
-            for label_name in labels_names
-        }
+        self.label_to_class = label_to_class
         self.start_month = start_month
         self.end_month = end_month
         self.max_n_days = (
@@ -225,7 +186,7 @@ class ChunkDataset(IterableDataset):
                     + f" or (({DATE_COL}.dt.year == {season}) and ({DATE_COL}.dt.month < {self.end_month}))"
                 ).sort_values(DATE_COL)
 
-                class_id = np.array([self.label_to_class.get(label, 0)])  # 1
+                class_id = np.array([CLASSES.index(label)])
 
                 ts, days, mask = self.transforms(season_features_df, season)
 

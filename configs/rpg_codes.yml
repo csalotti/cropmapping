@@ -1,0 +1,87 @@
+avoine:
+        - AVH
+        - AVP
+ble_tende:
+        - BTH
+        - BTP
+ble_dur:
+        - BDH
+        - BDP
+        - BDT
+bettrave:
+        - BTN
+        - BVF
+colza:
+        - CZH
+        - CZP
+feveroles:
+        - FVL
+        - FVT
+        - FFO
+        - FF5
+        - FF6
+        - FF7
+        - DFV
+haricots:
+        - HAR
+lentilles:
+        - LEC
+        - DLL
+        - LEF
+lin:
+        - LIH
+        - LIP
+        - LIF
+        - DLN
+lupin:
+        - LDP
+        - LDT
+        - LDH
+        - LFH
+        - LFP
+        - LH5
+        - LH6
+        - LH7
+        - LP5
+        - LP6
+        - LP7N
+        - DLP
+mais:
+        - MID
+        - MIE
+        - MIS
+millet:
+        - MLT
+        - DML
+orge:
+        - ORH
+        - ORP
+pois:
+        - PHI
+        - PPR
+        - PPT
+        - PFH
+        - PFP
+        - PH5
+        - PH6
+        - PH7
+        - PP5
+        - PP6
+        - PP7
+        - DPS
+seigle:
+        - SGH
+        - SGP
+        - DSG
+soja:
+        - SOJ
+        - DSJ
+sogho:
+        - SOG
+        - DSF
+tournesol:
+        - TRN
+        - DTN
+titicale:
+        - TTH
+        - TTP
