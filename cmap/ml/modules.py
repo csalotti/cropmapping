@@ -118,8 +118,8 @@ class SITSFormerModule(L.LightningModule):
         _, y_hat_cls = torch.max(y_hat, dim=1)
         loss = self.criterion(y_hat, y)
         f1_score = self.scorer(y_hat_cls, y)
-        self.log("train_loss", loss)
-        self.log("train_f1_score", f1_score)
+        self.logger.experiment.add_scalars("losses", {"train_loss" : loss})
+        self.logger.experiment.add_scalars("scores", {"train_f1" : f1_score})
         return {
             "loss": loss,
             "preds": y_hat,
@@ -135,8 +135,9 @@ class SITSFormerModule(L.LightningModule):
         _, y_hat_cls = torch.max(y_hat, dim=1)
         loss = self.criterion(y_hat, y)
         f1_score = self.scorer(y_hat_cls, y)
-        self.log("val_loss", loss)
-        self.log("val_f1_score", f1_score)
+        self.logger.experiment.add_scalars("losses", {"val_loss" : loss})
+        self.logger.experiment.add_scalars("scores", {"val_f1" : f1_score})
+
         self.conf_mat.update(y_hat, y)
 
     def on_validation_epoch_end(self):

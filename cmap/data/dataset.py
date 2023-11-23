@@ -118,8 +118,6 @@ class ChunkDataset(IterableDataset):
         )
         return chunk_it
 
-    def __len__(self):
-        return len(self.labels)
 
     def __iter__(self):
         # Workers infos
