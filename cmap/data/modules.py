@@ -1,6 +1,7 @@
 from glob import glob
 import logging
 from os.path import join
+from typing import List
 
 import pandas as pd
 import pytorch_lightning as L
@@ -9,17 +10,18 @@ from torch.utils.data.datapipes.iter.combinatorics import ShufflerIterDataPipe
 import yaml
 
 from utils.constants import LABEL_COL, POINT_ID_COL, SEASON_COL
-from data.dataset import ChunkDataset, CLASSES
+from data.dataset import ChunkDataset
 from utils.chunk import chunks_indexing
 
 logger = logging.getLogger("lightning.pytorch.datamodule")
-#logger.addHandler(logging.FileHandler("datamodule.log"))
+# logger.addHandler(logging.FileHandler("datamodule.log"))
 
 
 class SITSDataModule(L.LightningDataModule):
     def __init__(
         self,
         data_root: str,
+        classes: List[str],
         classes_config: str = "configs/rpg_codes.yml",
         batch_size: int = 32,
         prepare: bool = False,
@@ -30,6 +32,7 @@ class SITSDataModule(L.LightningDataModule):
 
         self.train_root = join(data_root, "train")
         self.val_root = join(data_root, "eval")
+        self.classes = classes
         self.classes_config = classes_config
         self.batch_size = batch_size
         self.prepare = prepare
@@ -58,7 +61,7 @@ class SITSDataModule(L.LightningDataModule):
         labels[LABEL_COL] = labels[LABEL_COL].map(
             lambda x: self.label_to_class.get(x, "other")
         )
-        labels = labels.query(f"{LABEL_COL} in {CLASSES}")
+        labels = labels.query(f"{LABEL_COL} in {self.classes}")
 
         # Subsample dataset respecting distribution of classes
         if self.records_frac < 1.0:
@@ -78,6 +81,7 @@ class SITSDataModule(L.LightningDataModule):
             features_root=train_features_root,
             labels=train_labels,
             indexes=train_indexes,
+            classes=self.classes,
             label_to_class=self.label_to_class,
         )
 
@@ -88,6 +92,7 @@ class SITSDataModule(L.LightningDataModule):
             features_root=val_features_root,
             labels=val_labels,
             indexes=val_indexes,
+            classes=self.classes,
             label_to_class=self.label_to_class,
         )
 
@@ -107,7 +112,7 @@ class SITSDataModule(L.LightningDataModule):
         )
 
     def val_dataloader(self):
-        dl = DataLoader(
+        return DataLoader(
             self.val_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
@@ -115,6 +120,3 @@ class SITSDataModule(L.LightningDataModule):
             drop_last=True,
             pin_memory=self.trainer.num_devices > 0,
         )
-        logger.debug("Val Dataloader")
-        logger.debug(next(iter(dl)))
-        return dl

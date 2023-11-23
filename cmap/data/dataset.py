@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from os.path import join
 from pprint import pformat
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -23,19 +23,9 @@ from utils.constants import (
 
 
 logger = logging.getLogger("lightning.pytorch.data.ChunkDataset")
-#logger.addHandler(logging.FileHandler("dataset.log"))
+# logger.addHandler(logging.FileHandler("dataset.log"))
 REFERENCE_YEAR = 2023
 MIN_DAYS = 3
-
-CLASSES = (
-    "other",
-    "ble_dur",
-    "ble_tendre",
-    "orge",
-    "colza",
-    "mais",
-    "tournesol",
-)
 
 
 class ChunkDataset(IterableDataset):
@@ -44,6 +34,7 @@ class ChunkDataset(IterableDataset):
         features_root: str,
         labels: pd.DataFrame,
         indexes: pd.DataFrame,
+        classes: List[str],
         label_to_class: Dict[str, int],
         start_month: int = 11,
         end_month: int = 12,
@@ -54,6 +45,7 @@ class ChunkDataset(IterableDataset):
         self.features_root = features_root
         self.labels = labels
         self.indexes = indexes.sort_values([CHUNK_ID_COL, START_COL])
+        self.classes = {cn: i for i, cn in enumerate(classes)}
         self.label_to_class = label_to_class
         self.start_month = start_month
         self.end_month = end_month
@@ -117,7 +109,6 @@ class ChunkDataset(IterableDataset):
             parse_dates=[date_col_idx],
         )
         return chunk_it
-
 
     def __iter__(self):
         # Workers infos
@@ -184,7 +175,7 @@ class ChunkDataset(IterableDataset):
                     + f" or (({DATE_COL}.dt.year == {season}) and ({DATE_COL}.dt.month < {self.end_month}))"
                 ).sort_values(DATE_COL)
 
-                class_id = np.array([CLASSES.index(label)])
+                class_id = np.array([self.classes[label]])
 
                 ts, days, mask = self.transforms(season_features_df, season)
 

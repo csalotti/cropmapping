@@ -7,7 +7,10 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR, LinearLR, SequentialLR
-from torchmetrics.classification import ConfusionMatrix, F1Score
+from torchmetrics.classification import (
+    MulticlassConfusionMatrix,
+    MulticlassF1Score,
+)
 
 from ml.embeddings.bands import PatchBandsEncoding
 from ml.embeddings.position import PositionalEncoding
@@ -16,7 +19,18 @@ from ml.models import MulticlassClassification, SITSFormerClassifier
 
 
 logger = logging.getLogger(__name__)
-#logger.addHandler(logging.FileHandler("ml.modules.log"))
+# logger.addHandler(logging.FileHandler("ml.modules.log"))
+
+DEFAULT_CLASSES = [
+    "other",
+    "ble_dur",
+    "ble_tendre",
+    "orge",
+    "colza",
+    "mais",
+    "tournesol",
+]
+
 
 class SITSFormerModule(L.LightningModule):
     def __init__(
@@ -24,7 +38,7 @@ class SITSFormerModule(L.LightningModule):
         n_bands: int = 9,
         max_n_days: int = 397,
         d_model: int = 256,
-        n_classes: int = 20,
+        classes: List[str] = DEFAULT_CLASSES,
         band_emb_chanels: List[int] = [32, 64],
         band_emb_kernel_size: List[int] = [5, 1, 5, 1],
         att_hidden_size: int = 256,
@@ -36,14 +50,14 @@ class SITSFormerModule(L.LightningModule):
         gamma: float = 0.99,
         warmup_epochs: int = 10,
         wd: float = 1e-4,
-        decay_max_epoch: int = 50,
     ):
         super().__init__()
 
         # Features
         self.max_n_days = max_n_days
         self.n_bands = n_bands
-        self.n_classes = n_classes
+        self.classes = classes
+        self.n_classes = len(classes)
 
         # Embedding
         self.d_model = d_model
@@ -60,24 +74,25 @@ class SITSFormerModule(L.LightningModule):
         self.gamma = gamma
         self.warmup_epochs = warmup_epochs
         self.wd = wd
-        self.decay_max_epoch = decay_max_epoch
-
-        # data
-        self.validation_outputs = []
 
         # layers and model
         band_emb_kernel_size[2] = n_bands - 4
 
         self.criterion = FocalLoss(gamma=1)
-        self.scorer = F1Score(task="multiclass", num_classes=n_classes)
-        self.conf_mat = ConfusionMatrix(task="multiclass", num_classes=n_classes)
+        self.train_f1 = MulticlassF1Score(num_classes=len(classes))
+        self.val_f1 = MulticlassF1Score(num_classes=len(classes))
+        self.conf_mat = MulticlassConfusionMatrix(
+            num_classes=len(classes),
+            normalize="true",
+        )
 
         self.save_hyperparameters()
         self._create_model()
 
     def _create_model(self):
         position_encoder = PositionalEncoding(
-            d_model=self.d_model, max_len=self.max_n_days
+            d_model=self.d_model,
+            max_len=self.max_n_days,
         )
         bands_encoder = PatchBandsEncoding(
             channel_size=self.band_emb_chanels + [self.d_model],
@@ -117,37 +132,63 @@ class SITSFormerModule(L.LightningModule):
         y = y.squeeze()
         _, y_hat_cls = torch.max(y_hat, dim=1)
         loss = self.criterion(y_hat, y)
-        f1_score = self.scorer(y_hat_cls, y)
-        self.logger.experiment.add_scalars("losses", {"train_loss" : loss})
-        self.logger.experiment.add_scalars("scores", {"train_f1" : f1_score})
-        return {
-            "loss": loss,
-            "preds": y_hat,
-            "targets": y,
-        }
+        f1_score = self.train_f1(y_hat_cls, y)
+
+        self.log_dict(
+            {
+                "Losses/train": loss,
+                "F1/train": f1_score,
+            },
+            on_step=True,
+            on_epoch=False,
+        )
+
+        return loss
+
+    def on_train_epoch_end(self):
+        self.logger.experiment.add_scalars(
+            "F1/epoch",
+            {"train": self.train_f1.compute()},
+            global_step=self.current_epoch,
+        )
+        self.train_f1.reset()
 
     def validation_step(self, batch, batch_idx):
-        logger.debug("Validation")
-        1
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
         y_hat = self.classifier(ts, days, mask)
         y = y.squeeze()
         _, y_hat_cls = torch.max(y_hat, dim=1)
+
         loss = self.criterion(y_hat, y)
-        f1_score = self.scorer(y_hat_cls, y)
-        self.logger.experiment.add_scalars("losses", {"val_loss" : loss})
-        self.logger.experiment.add_scalars("scores", {"val_f1" : f1_score})
+        f1_score = self.val_f1(y_hat_cls, y)
+
+        self.log_dict(
+            {
+                "Losses/val": loss,
+                "F1/val": f1_score,
+            },
+            on_step=True,
+            on_epoch=False,
+        )
 
         self.conf_mat.update(y_hat, y)
 
     def on_validation_epoch_end(self):
-        fig_, _ = self.conf_mat.plot()
+        fig_, _ = self.conf_mat.plot(labels=self.classes)
 
         self.logger.experiment.add_figure(
-            "Validation Confusion matrix", fig_, self.current_epoch
+            "Validation Confusion matrix",
+            fig_,
+            self.current_epoch,
+        )
+        self.logger.experiment.add_scalars(
+            "F1/epoch",
+            {"val": self.val_f1.compute()},
+            global_step=self.current_epoch,
         )
 
-        self.validation_outputs.clear()
+        self.val_f1.reset()
+        self.conf_mat.reset()
 
     def configure_optimizers(self):
         optimizer = Adam(
