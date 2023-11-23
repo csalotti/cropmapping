@@ -1,7 +1,8 @@
 import logging
 from typing import List
-from lightning_utilities.core.imports import P
 
+import numpy as np
+import seaborn as sns
 import pytorch_lightning as L
 import torch
 import torch.nn as nn
@@ -78,6 +79,7 @@ class SITSFormerModule(L.LightningModule):
         # layers and model
         band_emb_kernel_size[2] = n_bands - 4
 
+        # Metrics
         self.criterion = FocalLoss(gamma=1)
         self.train_f1 = MulticlassF1Score(num_classes=len(classes))
         self.val_f1 = MulticlassF1Score(num_classes=len(classes))
@@ -85,6 +87,9 @@ class SITSFormerModule(L.LightningModule):
             num_classes=len(classes),
             normalize="true",
         )
+
+        # data
+        self.val_emb = []
 
         self.save_hyperparameters()
         self._create_model()
@@ -173,8 +178,24 @@ class SITSFormerModule(L.LightningModule):
 
         self.conf_mat.update(y_hat, y)
 
+        if self.current_epoch % 10 == 0:
+            self.val_emb.append(
+                {
+                    "embeddings": y_hat.numpy(),
+                    "labels": [self.classes[yi] for yi in y.tolist()],
+                }
+            )
+
     def on_validation_epoch_end(self):
-        fig_, _ = self.conf_mat.plot(labels=self.classes)
+        fig_ = sns.heatmap(
+            self.conf_mat.compute().numpy(),
+            cmap="magma",
+            annot=True,
+            fmt=".2f",
+            cbar=False,
+            xticklabels=self.classes,
+            yticklabels=self.classes,
+        ).get_figure()
 
         self.logger.experiment.add_figure(
             "Validation Confusion matrix",
@@ -187,8 +208,18 @@ class SITSFormerModule(L.LightningModule):
             global_step=self.current_epoch,
         )
 
+        if self.current_epoch % 10 == 0:
+            emb = np.concatenate([d["embeddings"] for d in self.val_emb], axis=0)
+            metadata = [di for d in self.val_emb for di in d["labels"]]
+            self.logger.experiment.add_embedding(
+                emb,
+                metadata=metadata,
+                global_step=self.current_epoch,
+            )
+
         self.val_f1.reset()
         self.conf_mat.reset()
+        self.val_emb.clear()
 
     def configure_optimizers(self):
         optimizer = Adam(

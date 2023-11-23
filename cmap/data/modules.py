@@ -40,6 +40,7 @@ class SITSDataModule(L.LightningDataModule):
         self.records_frac = records_frac
 
     def prepare_data(self) -> None:
+        # Map codes to labels
         with open(self.classes_config, "r") as f:
             class_to_label = yaml.safe_load(f)
             self.label_to_class = {v: k for k, vs in class_to_label.items() for v in vs}
@@ -54,7 +55,7 @@ class SITSDataModule(L.LightningDataModule):
 
         indexes = pd.read_json(join(features_root, "indexes.json"))
 
-        # Select subset of available classes
+        # Label loading and code mapping
         labels = pd.concat(
             [pd.read_csv(f, index_col=0) for f in glob(join(labels_root, "*.csv"))]
         )
@@ -63,17 +64,31 @@ class SITSDataModule(L.LightningDataModule):
         )
         labels = labels.query(f"{LABEL_COL} in {self.classes}")
 
+        # Subsample other class to be 1% highe than second top
+        labels_dist = labels[LABEL_COL].value_counts().reset_index()
+        if labels_dist.iloc[0][LABEL_COL] == "other":
+            n_samples = int(1.01 * labels_dist.iloc[1, 1])
+            labels = pd.concat(
+                [
+                    labels.query(f"{LABEL_COL} == 'other'").sample(n_samples),
+                    labels.query(f"{LABEL_COL} != 'other'"),
+                ]
+            )
+
         # Subsample dataset respecting distribution of classes
         if self.records_frac < 1.0:
             labels = labels.groupby([LABEL_COL, SEASON_COL], group_keys=False).apply(
                 lambda x: x.sample(frac=self.records_frac)
             )
-            indexes = indexes[indexes[POINT_ID_COL].isin(labels[POINT_ID_COL])]
+
+        # Ensure indexes and labels have common ids
+        indexes = indexes[indexes[POINT_ID_COL].isin(labels[POINT_ID_COL])]
 
         return indexes, labels
 
     def setup(self, stage: str):
         logger.debug(f"Stage {stage}")
+
         # Train
         train_features_root = join(self.train_root, "features")
         train_indexes, train_labels = self.__retrieve(self.train_root)
