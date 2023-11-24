@@ -114,7 +114,7 @@ class SITSDataModule(L.LightningDataModule):
     def train_dataloader(self):
         ds_shuffled = ShufflerIterDataPipe(
             self.train_dataset,
-            buffer_size=self.batch_size * 10,
+            buffer_size=100,
         )
         return DataLoader(
             ds_shuffled,
