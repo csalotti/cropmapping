@@ -20,7 +20,7 @@ from ml.models import MulticlassClassification, SITSFormerClassifier
 
 
 logger = logging.getLogger(__name__)
-# logger.addHandler(logging.FileHandler("ml.modules.log"))
+# logger.addHandler(logging.FileHandler("cmap.ml.modules.log"))
 
 DEFAULT_CLASSES = [
     "other",
@@ -139,6 +139,7 @@ class SITSFormerModule(L.LightningModule):
         loss = self.criterion(y_hat, y)
         f1_score = self.train_f1(y_hat_cls, y)
 
+        logger.debug(batch)
         self.log_dict(
             {
                 "Losses/train": loss,
@@ -181,14 +182,14 @@ class SITSFormerModule(L.LightningModule):
         if self.current_epoch % 10 == 0:
             self.val_emb.append(
                 {
-                    "embeddings": y_hat.numpy(),
-                    "labels": [self.classes[yi] for yi in y.tolist()],
+                    "embeddings": y_hat.cpu().numpy(),
+                    "labels": [self.classes[yi] for yi in y.cpu().tolist()],
                 }
             )
 
     def on_validation_epoch_end(self):
         fig_ = sns.heatmap(
-            self.conf_mat.compute().numpy(),
+            self.conf_mat.compute().cpu().numpy(),
             cmap="magma",
             annot=True,
             fmt=".2f",

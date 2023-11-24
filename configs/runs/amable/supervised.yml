@@ -4,7 +4,7 @@ trainer:
 data:
   data_root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_sorted
   num_workers: 32
-  batch_size: 512
+  batch_size: 256
   records_frac : 0.1
   classes:
     - other

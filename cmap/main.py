@@ -5,7 +5,7 @@ from data.modules import SITSDataModule
 from ml.modules import SITSFormerModule
 
 # configure logging at the root level of Lightning
-logging.getLogger("lightning.pytorch").setLevel(logging.DEBUG)
+logging.getLogger("cmap").setLevel(logging.DEBUG)
 
 
 def cli_main():
