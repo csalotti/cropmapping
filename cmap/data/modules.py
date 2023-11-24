@@ -13,7 +13,7 @@ from utils.constants import LABEL_COL, POINT_ID_COL, SEASON_COL
 from data.dataset import ChunkDataset
 from utils.chunk import chunks_indexing
 
-logger = logging.getLogger("lightning.pytorch.datamodule")
+logger = logging.getLogger("cmap.data.module")
 # logger.addHandler(logging.FileHandler("datamodule.log"))
 
 

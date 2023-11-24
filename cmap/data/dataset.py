@@ -22,7 +22,7 @@ from utils.constants import (
 )
 
 
-logger = logging.getLogger("lightning.pytorch.data.ChunkDataset")
+logger = logging.getLogger("cmap.data.ChunkDataset")
 # logger.addHandler(logging.FileHandler("dataset.log"))
 REFERENCE_YEAR = 2023
 MIN_DAYS = 3

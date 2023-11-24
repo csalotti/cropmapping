@@ -13,13 +13,11 @@ from torchmetrics.classification import (
     MulticlassF1Score,
 )
 
-from ml.embeddings.bands import PatchBandsEncoding
-from ml.embeddings.position import PositionalEncoding
 from ml.losses import FocalLoss
-from ml.models import MulticlassClassification, SITSFormerClassifier
+from ml.encoders import SITSFormer
+from ml.decoders import MulticlassClassification
 
-
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("cmap.ml.modules")
 # logger.addHandler(logging.FileHandler("cmap.ml.modules.log"))
 
 DEFAULT_CLASSES = [
@@ -33,19 +31,12 @@ DEFAULT_CLASSES = [
 ]
 
 
-class SITSFormerModule(L.LightningModule):
+class Classifier(L.LightningModule):
     def __init__(
         self,
-        n_bands: int = 9,
-        max_n_days: int = 397,
-        d_model: int = 256,
+        encoder: nn.Module,
+        decoder: nn.Module,
         classes: List[str] = DEFAULT_CLASSES,
-        band_emb_chanels: List[int] = [32, 64],
-        band_emb_kernel_size: List[int] = [5, 1, 5, 1],
-        att_hidden_size: int = 256,
-        n_att_head: int = 8,
-        n_att_layers: int = 3,
-        dropout_p: float = 0.1,
         min_lr: float = 1e-6,
         max_lr: float = 1e-4,
         gamma: float = 0.99,
@@ -54,20 +45,9 @@ class SITSFormerModule(L.LightningModule):
     ):
         super().__init__()
 
-        # Features
-        self.max_n_days = max_n_days
-        self.n_bands = n_bands
+        # labels
         self.classes = classes
         self.n_classes = len(classes)
-
-        # Embedding
-        self.d_model = d_model
-        self.band_emb_chanels = band_emb_chanels
-        self.band_emb_kernel_size = band_emb_kernel_size
-        self.att_hidden_size = att_hidden_size
-        self.n_att_head = n_att_head
-        self.n_att_layers = n_att_layers
-        self.dropout_p = dropout_p
 
         # Optimizationin
         self.min_lr = min_lr
@@ -75,9 +55,6 @@ class SITSFormerModule(L.LightningModule):
         self.gamma = gamma
         self.warmup_epochs = warmup_epochs
         self.wd = wd
-
-        # layers and model
-        band_emb_kernel_size[2] = n_bands - 4
 
         # Metrics
         self.criterion = FocalLoss(gamma=1)
@@ -95,45 +72,9 @@ class SITSFormerModule(L.LightningModule):
         # data
         self.val_emb = []
 
-        self.save_hyperparameters()
-        self._create_model()
-
-    def _create_model(self):
-        position_encoder = PositionalEncoding(
-            d_model=self.d_model,
-            max_len=self.max_n_days,
-        )
-        bands_encoder = PatchBandsEncoding(
-            channel_size=self.band_emb_chanels + [self.d_model],
-            kernel_size=self.band_emb_kernel_size,
-        )
-
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=self.d_model,
-            nhead=self.n_att_head,
-            dim_feedforward=self.att_hidden_size * 4,
-            dropout=self.dropout_p,
-            batch_first=True,
-        )
-        encoder_norm = nn.LayerNorm(self.att_hidden_size)
-
-        transformer_encoder = nn.TransformerEncoder(
-            encoder_layer=encoder_layer,
-            num_layers=self.n_att_layers,
-            norm=encoder_norm,
-        )
-
-        clf_head = MulticlassClassification(
-            self.att_hidden_size,
-            self.n_classes,
-        )
-
-        self.classifier = SITSFormerClassifier(
-            position_encoder,
-            bands_encoder,
-            transformer_encoder,
-            clf_head,
-        )
+        # Layers
+        self.encoder = encoder
+        self.decoder = decoder
 
     def training_step(self, batch, batch_idx):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
@@ -266,3 +207,48 @@ class SITSFormerModule(L.LightningModule):
         )
 
         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler}
+
+
+class SITSFormerClassifier(Classifier):
+    def __init__(
+        self,
+        n_bands: int = 9,
+        max_n_days: int = 397,
+        d_model: int = 256,
+        classes: List[str] = DEFAULT_CLASSES,
+        band_emb_chanels: List[int] = [32, 64],
+        band_emb_kernel_size: List[int] = [5, 1, 5, 1],
+        n_att_head: int = 8,
+        n_att_layers: int = 3,
+        dropout_p: float = 0.1,
+        min_lr: float = 1e-6,
+        max_lr: float = 1e-4,
+        gamma: float = 0.99,
+        warmup_epochs: int = 10,
+        wd: float = 1e-4,
+    ):
+        sits = SITSFormer(
+            n_bands=n_bands,
+            max_n_days=max_n_days,
+            d_model=d_model,
+            band_emb_chanels=band_emb_chanels,
+            band_emb_kernel_size=band_emb_kernel_size,
+            n_att_head=n_att_head,
+            n_att_layers=n_att_layers,
+            dropout_p=dropout_p,
+        )
+
+        clf_head = MulticlassClassification(d_model, len(classes))
+
+        super().__init__(
+            encoder=sits,
+            decoder=clf_head,
+            classes=classes,
+            min_lr=min_lr,
+            max_lr=max_lr,
+            gamma=gamma,
+            warmup_epochs=warmup_epochs,
+            wd=wd,
+        )
+
+        self.save_hyperparameters()
