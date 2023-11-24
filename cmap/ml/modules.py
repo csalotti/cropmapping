@@ -83,7 +83,11 @@ class SITSFormerModule(L.LightningModule):
         self.criterion = FocalLoss(gamma=1)
         self.train_f1 = MulticlassF1Score(num_classes=len(classes))
         self.val_f1 = MulticlassF1Score(num_classes=len(classes))
-        self.conf_mat = MulticlassConfusionMatrix(
+        self.train_conf_mat = MulticlassConfusionMatrix(
+            num_classes=len(classes),
+            normalize="true",
+        )
+        self.val_conf_mat = MulticlassConfusionMatrix(
             num_classes=len(classes),
             normalize="true",
         )
@@ -138,6 +142,7 @@ class SITSFormerModule(L.LightningModule):
         _, y_hat_cls = torch.max(y_hat, dim=1)
         loss = self.criterion(y_hat, y)
         f1_score = self.train_f1(y_hat_cls, y)
+        self.train_conf_mat.update(y_hat, y)
 
         logger.debug(batch)
         self.log_dict(
@@ -152,12 +157,29 @@ class SITSFormerModule(L.LightningModule):
         return loss
 
     def on_train_epoch_end(self):
+        fig_ = sns.heatmap(
+            self.train_conf_mat.compute().cpu().numpy(),
+            cmap="magma",
+            annot=True,
+            fmt=".2f",
+            cbar=False,
+            xticklabels=self.classes,
+            yticklabels=self.classes,
+        ).get_figure()
+
+        self.logger.experiment.add_figure(
+            "Confusion matrix/Training",
+            fig_,
+            self.current_epoch,
+        )
+
         self.logger.experiment.add_scalars(
             "F1/epoch",
             {"train": self.train_f1.compute()},
             global_step=self.current_epoch,
         )
         self.train_f1.reset()
+        self.train_conf_mat.reset()
 
     def validation_step(self, batch, batch_idx):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
@@ -177,7 +199,7 @@ class SITSFormerModule(L.LightningModule):
             on_epoch=False,
         )
 
-        self.conf_mat.update(y_hat, y)
+        self.val_conf_mat.update(y_hat, y)
 
         if self.current_epoch % 10 == 0:
             self.val_emb.append(
@@ -199,7 +221,7 @@ class SITSFormerModule(L.LightningModule):
         ).get_figure()
 
         self.logger.experiment.add_figure(
-            "Validation Confusion matrix",
+            "Confusion matrix/Validation",
             fig_,
             self.current_epoch,
         )
@@ -219,7 +241,7 @@ class SITSFormerModule(L.LightningModule):
             )
 
         self.val_f1.reset()
-        self.conf_mat.reset()
+        self.val_conf_mat.reset()
         self.val_emb.clear()
 
     def configure_optimizers(self):
