@@ -1,3 +1,2 @@
-trainer:
-  callbacks: pytorch_lightning.callbacks.LearningRateMonitor
-  max_epochs: 200
+callbacks: pytorch_lightning.callbacks.LearningRateMonitor
+max_epochs: 200
