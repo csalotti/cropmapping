@@ -37,7 +37,7 @@ class SITSDataModule(L.LightningDataModule):
         self.classes = classes
         self.classes_config = classes_config
         self.batch_size = batch_size
-        self.prepare = prepare_class
+        self.prepare = prepare
         self.subsample = subsample
         self.num_workers = num_workers
         self.records_frac = records_frac
