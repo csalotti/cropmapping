@@ -1,6 +1,7 @@
 from glob import glob
 import logging
 from os.path import join
+from types import prepare_class
 from typing import List
 
 import pandas as pd
@@ -27,6 +28,7 @@ class SITSDataModule(L.LightningDataModule):
         prepare: bool = False,
         num_workers: int = 3,
         records_frac: float = 1.0,
+        subsample: bool = False,
     ):
         L.LightningDataModule.__init__(self)
 
@@ -35,7 +37,8 @@ class SITSDataModule(L.LightningDataModule):
         self.classes = classes
         self.classes_config = classes_config
         self.batch_size = batch_size
-        self.prepare = prepare
+        self.prepare = prepare_class
+        self.subsample = subsample
         self.num_workers = num_workers
         self.records_frac = records_frac
 
@@ -65,21 +68,22 @@ class SITSDataModule(L.LightningDataModule):
         labels = labels.query(f"{LABEL_COL} in {self.classes}")
 
         # Subsample other class to be 1% highe than second top
-        labels_dist = labels[LABEL_COL].value_counts().reset_index()
-        if labels_dist.iloc[0][LABEL_COL] == "other":
-            n_samples = int(1.01 * labels_dist.iloc[1, 1])
-            labels = pd.concat(
-                [
-                    labels.query(f"{LABEL_COL} == 'other'").sample(n_samples),
-                    labels.query(f"{LABEL_COL} != 'other'"),
-                ]
-            )
+        if self.subsample:
+            labels_dist = labels[LABEL_COL].value_counts().reset_index()
+            if labels_dist.iloc[0][LABEL_COL] == "other":
+                n_samples = int(1.01 * labels_dist.iloc[1, 1])
+                labels = pd.concat(
+                    [
+                        labels.query(f"{LABEL_COL} == 'other'").sample(n_samples),
+                        labels.query(f"{LABEL_COL} != 'other'"),
+                    ]
+                )
 
-        # Subsample dataset respecting distribution of classes
-        if self.records_frac < 1.0:
-            labels = labels.groupby([LABEL_COL, SEASON_COL], group_keys=False).apply(
-                lambda x: x.sample(frac=self.records_frac)
-            )
+            # Subsample dataset respecting distribution of classes
+            if self.records_frac < 1.0:
+                labels = labels.groupby(
+                    [LABEL_COL, SEASON_COL], group_keys=False
+                ).apply(lambda x: x.sample(frac=self.records_frac))
 
         # Ensure indexes and labels have common ids
         indexes = indexes[indexes[POINT_ID_COL].isin(labels[POINT_ID_COL])]
