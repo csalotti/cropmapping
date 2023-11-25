@@ -14,8 +14,6 @@ from torchmetrics.classification import (
 )
 
 from ml.losses import FocalLoss
-from ml.encoders import SITSFormer
-from ml.decoders import MulticlassClassification
 
 logger = logging.getLogger("cmap.ml.modules")
 # logger.addHandler(logging.FileHandler("cmap.ml.modules.log"))
@@ -78,9 +76,16 @@ class Classifier(L.LightningModule):
 
     def training_step(self, batch, batch_idx):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
-        y_hat = self.classifier(ts, days, mask)
+
+        # Infer
+        ts_encoded = self.encoder(ts, days, mask)
+        y_hat = self.decoder(ts_encoded, mask)
+
+        # Reshape
         y = y.squeeze()
         _, y_hat_cls = torch.max(y_hat, dim=1)
+
+        # Metrics
         loss = self.criterion(y_hat, y)
         f1_score = self.train_f1(y_hat_cls, y)
         self.train_conf_mat.update(y_hat, y)
@@ -124,10 +129,16 @@ class Classifier(L.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
-        y_hat = self.classifier(ts, days, mask)
+
+        # Infer
+        ts_encoded = self.encoder(ts, days, mask)
+        y_hat = self.decoder(ts_encoded, mask)
+
+        # Reshape
         y = y.squeeze()
         _, y_hat_cls = torch.max(y_hat, dim=1)
 
+        # Metrics
         loss = self.criterion(y_hat, y)
         f1_score = self.val_f1(y_hat_cls, y)
 
@@ -152,7 +163,7 @@ class Classifier(L.LightningModule):
 
     def on_validation_epoch_end(self):
         fig_ = sns.heatmap(
-            self.conf_mat.compute().cpu().numpy(),
+            self.val_conf_mat.compute().cpu().numpy(),
             cmap="magma",
             annot=True,
             fmt=".2f",
@@ -187,7 +198,7 @@ class Classifier(L.LightningModule):
 
     def configure_optimizers(self):
         optimizer = Adam(
-            self.classifier.parameters(),
+            self.parameters(),
             lr=self.max_lr,
             weight_decay=self.wd,
         )
@@ -207,48 +218,3 @@ class Classifier(L.LightningModule):
         )
 
         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler}
-
-
-class SITSFormerClassifier(Classifier):
-    def __init__(
-        self,
-        n_bands: int = 9,
-        max_n_days: int = 397,
-        d_model: int = 256,
-        classes: List[str] = DEFAULT_CLASSES,
-        band_emb_chanels: List[int] = [32, 64],
-        band_emb_kernel_size: List[int] = [5, 1, 5, 1],
-        n_att_head: int = 8,
-        n_att_layers: int = 3,
-        dropout_p: float = 0.1,
-        min_lr: float = 1e-6,
-        max_lr: float = 1e-4,
-        gamma: float = 0.99,
-        warmup_epochs: int = 10,
-        wd: float = 1e-4,
-    ):
-        sits = SITSFormer(
-            n_bands=n_bands,
-            max_n_days=max_n_days,
-            d_model=d_model,
-            band_emb_chanels=band_emb_chanels,
-            band_emb_kernel_size=band_emb_kernel_size,
-            n_att_head=n_att_head,
-            n_att_layers=n_att_layers,
-            dropout_p=dropout_p,
-        )
-
-        clf_head = MulticlassClassification(d_model, len(classes))
-
-        super().__init__(
-            encoder=sits,
-            decoder=clf_head,
-            classes=classes,
-            min_lr=min_lr,
-            max_lr=max_lr,
-            gamma=gamma,
-            warmup_epochs=warmup_epochs,
-            wd=wd,
-        )
-
-        self.save_hyperparameters()

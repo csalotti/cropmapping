@@ -1,8 +1,7 @@
 import logging
 
-from typing import Optional, Union
 import torch
-
+from torch import nn
 
 logger = logging.getLogger("cmap.ml.decoders")
 

@@ -3,6 +3,7 @@ from datetime import datetime
 from os.path import join
 from pprint import pformat
 from typing import Dict, List
+from random import random
 
 import numpy as np
 import pandas as pd
@@ -41,6 +42,8 @@ class ChunkDataset(IterableDataset):
         n_steps: int = 3,
         standardize: bool = False,
         max_records: int = -1,
+        ablation: bool = False,
+        ablation_frac: float = 0.4,
     ):
         self.features_root = features_root
         self.labels = labels
@@ -58,6 +61,8 @@ class ChunkDataset(IterableDataset):
         ) // n_steps
         self.standardize = standardize
         self.max_records = max_records
+        self.ablation = ablation
+        self.ablation_frac = ablation_frac
 
         logger.debug(f"Time Series sampled on {self.max_n_days} days")
 
@@ -89,12 +94,23 @@ class ChunkDataset(IterableDataset):
             (self.max_n_days - n_days, 0),
             constant_values=0,
         )
-        mask = np.array([False] * (self.max_n_days - n_days) + [True] * n_days)
+        days_offset = self.max_n_days - n_days
+        mask = np.array([False] * days_offset + [True] * n_days)
 
-        # Add fourth and fifth dimension for conv
-        ts_expanded = np.expand_dims(np.expand_dims(ts_padded, axis=-1), axis=-1)
+        # remove some days if ablation
+        if self.ablation:
+            n_removed_days = int(self.ablation_frac * n_days)
+            if random() < 0.5:
+                start_idx = days_offset + np.random.choice(range(n_removed_days), 1)[0]
+                mask[start_idx : start_idx + n_removed_days] = False
+            else:
+                indexes = np.random.choice(
+                    range(days_offset, self.max_n_days),
+                    n_removed_days,
+                )
+                mask[indexes] = False
 
-        return ts_expanded, days_padded, mask
+        return ts_padded, days_padded, mask
 
     def _read_chunk(self, chunk_id: int) -> TextFileReader:
         date_col_idx = (

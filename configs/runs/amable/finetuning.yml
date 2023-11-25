@@ -1,0 +1,23 @@
+model:
+  class_path: ml.classifiers.Classifier
+  init_args:
+    encoder:
+      class_path : ml.encoders.SITSFormer
+      init_args:
+        max_n_days: 397
+        d_model: 256
+        band_emb_chanels:
+          - 32
+          - 64
+        band_emb_kernel_size: 
+          - 5
+          - 5
+        n_att_head: 8
+        n_att_layers: 4
+        dropout_p: 0.1
+    decoder:
+      class_path: ml.decoders.MulticlassClassification      
+      init_args:
+        hidden: 256 
+        num_classes: 7
+

@@ -1,11 +1,9 @@
-trainer:
-  callbacks: pytorch_lightning.callbacks.LearningRateMonitor
-  max_epochs: 100
 data:
+  class_path: data.modules.SITSDataModule
+  init_args:
   data_root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_sorted
   num_workers: 32
-  batch_size: 256
-  records_frac : 0.1
+  batch_size: 512
   classes:
     - other
     - ble_dur
@@ -14,7 +12,4 @@ data:
     - colza
     - mais
     - tournesol
-model:
-  n_bands: 9
-  max_n_days : 397
-  d_model : 256 
+

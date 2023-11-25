@@ -39,6 +39,7 @@ class AutoEncoder(L.LightningModule):
         ts_hat = self.decoder(ts_encoded)
 
         loss = self.criterion(ts_hat, ts)
+        loss = (loss.mean(dim=-1) * mask.float()).sum() / mask.sum()
 
         self.log_dict(
             {
@@ -47,7 +48,6 @@ class AutoEncoder(L.LightningModule):
             on_step=True,
             on_epoch=False,
         )
-
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -57,6 +57,7 @@ class AutoEncoder(L.LightningModule):
         ts_hat = self.decoder(ts_encoded)
 
         loss = self.criterion(ts_hat, ts)
+        loss = (loss.mean(dim=-1) * mask.float()).sum() / mask.sum()
 
         self.log_dict(
             {
@@ -70,7 +71,7 @@ class AutoEncoder(L.LightningModule):
 
     def configure_optimizers(self):
         optimizer = Adam(
-            self.classifier.parameters(),
+            self.parameters(),
             lr=self.max_lr,
             weight_decay=self.wd,
         )
@@ -90,20 +91,3 @@ class AutoEncoder(L.LightningModule):
         )
 
         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler}
-
-
-class SITSFormerPre(AutoEncoder):
-    def __init__(
-        self,
-        encoder: nn.Module,
-        decoder: nn.Module,
-        criterion: nn.Module,
-        min_lr: float = 0.000001,
-        max_lr: float = 0.0001,
-        gamma: float = 0.99,
-        warmup_epochs: int = 10,
-        wd: float = 0.0001,
-    ):
-        super().__init__(
-            encoder, decoder, criterion, min_lr, max_lr, gamma, warmup_epochs, wd
-        )
