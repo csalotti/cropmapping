@@ -1,26 +1,36 @@
-class_path: ml.autoencoders.AutoEncoder
-init_args:
-  encoder:
-    class_path : ml.encoders.SITSFormer
-    init_args:
-      max_n_days: 397
-      d_model: 256
-      band_emb_chanels:
-        - 32
-        - 64
-      band_emb_kernel_size: 
-        - 5
-        - 5
-      n_att_head: 8
-      n_att_layers: 4
-      dropout_p: 0.1
-  decoder:
-    class_path: torch.nn.Linear
-    init_args:
-      in_features: 256
-      out_features: 9
-  criterion:
-    class_path: torch.nn.MSELoss
-    init_args:
-      reduction: none
+trainer:
+  callbacks: pytorch_lightning.callbacks.LearningRateMonitor
+  max_epochs: 200
+data:
+  class_path: data.modules.MaskedDataModule
+  init_args:
+    data_root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_sorted
+    num_workers: 32
+    batch_size: 512
+model:
+  class_path: ml.autoencoders.AutoEncoder
+  init_args:
+    encoder:
+      class_path : ml.encoders.SITSFormer
+      init_args:
+        max_n_days: 397
+        d_model: 256
+        band_emb_chanels:
+          - 32
+          - 64
+        band_emb_kernel_size: 
+          - 5
+          - 5
+        n_att_head: 8
+        n_att_layers: 4
+        dropout_p: 0.1
+    decoder:
+      class_path: torch.nn.Linear
+      init_args:
+        in_features: 256
+        out_features: 9
+    criterion:
+      class_path: torch.nn.MSELoss
+      init_args:
+        reduction: none
 

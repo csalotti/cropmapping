@@ -33,13 +33,15 @@ class AutoEncoder(L.LightningModule):
         self.decoder = decoder
 
     def training_step(self, batch, batch_idx):
-        ts, days, mask, _ = [batch[k] for k in ["ts", "days", "mask", "class"]]
+        ts, days, target, mask, loss_mask = [
+            batch[k] for k in ["ts", "days", "target", "mask", "loss_mask"]
+        ]
 
         ts_encoded = self.encoder(ts, days, mask)
         ts_hat = self.decoder(ts_encoded)
 
-        loss = self.criterion(ts_hat, ts)
-        loss = (loss.mean(dim=-1) * mask.float()).sum() / mask.sum()
+        loss = self.criterion(ts_hat, target)
+        loss = (loss.mean(dim=-1) * loss_mask.float()).sum() / loss_mask.sum()
 
         self.log_dict(
             {
@@ -51,13 +53,15 @@ class AutoEncoder(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        ts, days, mask, _ = [batch[k] for k in ["ts", "days", "mask", "class"]]
+        ts, days, target, mask, loss_mask = [
+            batch[k] for k in ["ts", "days", "target", "mask", "loss_mask"]
+        ]
 
         ts_encoded = self.encoder(ts, days, mask)
         ts_hat = self.decoder(ts_encoded)
 
-        loss = self.criterion(ts_hat, ts)
-        loss = (loss.mean(dim=-1) * mask.float()).sum() / mask.sum()
+        loss = self.criterion(ts_hat, target)
+        loss = (loss.mean(dim=-1) * loss_mask.float()).sum() / loss_mask.sum()
 
         self.log_dict(
             {

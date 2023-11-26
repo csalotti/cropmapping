@@ -1,22 +1,40 @@
-class_path: ml.classifiers.Classifier
-init_args:
-  encoder:
-    class_path : ml.encoders.SITSFormer
-    init_args:
-      max_n_days: 397
-      d_model: 256
-      band_emb_chanels:
-        - 32
-        - 64
-      band_emb_kernel_size: 
-        - 5
-        - 5
-      n_att_head: 8
-      n_att_layers: 4
-      dropout_p: 0.1
-  decoder:
-    class_path: ml.decoders.MulticlassClassification      
-    init_args:
-      hidden: 256 
-      num_classes: 7
+trainer:
+  callbacks: pytorch_lightning.callbacks.LearningRateMonitor
+  max_epochs: 30
+data:
+  class_path: data.modules.LabelledDataModule
+  init_args:
+    data_root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_sorted
+    num_workers: 32
+    batch_size: 512
+    classes:
+      - other
+      - ble_dur
+      - ble_tendre
+      - orge
+      - colza
+      - mais
+      - tournesol
+model:
+  class_path: ml.classifiers.Classifier
+  init_args:
+    encoder:
+      class_path : ml.encoders.SITSFormer
+      init_args:
+        max_n_days: 397
+        d_model: 256
+        band_emb_chanels:
+          - 32
+          - 64
+        band_emb_kernel_size: 
+          - 5
+          - 5
+        n_att_head: 8
+        n_att_layers: 4
+        dropout_p: 0.1
+    decoder:
+      class_path: ml.decoders.MulticlassClassification      
+      init_args:
+        hidden: 256 
+        num_classes: 7
 
