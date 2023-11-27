@@ -41,6 +41,8 @@ class AutoEncoder(L.LightningModule):
         self.ndvi_sample = ndvi_sample
         self.val_data = []
 
+        self.save_hyperparameters()
+
     def training_step(self, batch, batch_idx):
         ts, days, target, mask, loss_mask, _ = [
             batch[k] for k in ["ts", "days", "target", "mask", "loss_mask", "season"]
@@ -87,7 +89,7 @@ class AutoEncoder(L.LightningModule):
             )
             self.val_data.append(
                 {
-                    "ts": ts.cpu().numpy()[indexes, :, :],
+                    "target": target.cpu().numpy()[indexes, :, :],
                     "ts_hat": ts_hat.cpu().numpy()[indexes, :, :],
                     "days": days.cpu().numpy()[indexes, :],
                     "mask": mask.cpu().numpy()[indexes, :],
@@ -101,14 +103,14 @@ class AutoEncoder(L.LightningModule):
     def on_validation_end(self) -> None:
         if len(self.val_data) > 0:
             batch = self.val_data.pop()
-            batch_size = batch["ts"].shape[0]
+            batch_size = batch["target"].shape[0]
             for i in range(batch_size):
                 ndvi_fig = plot_ndvi(
                     days=batch["days"][i],
                     days_mask=batch["mask"][i],
                     removed_days_mask=batch["loss_mask"][i],
                     pred=batch["ts_hat"][i],
-                    gd=batch["ts"][i],
+                    gt=batch["target"][i],
                 )
 
                 self.logger.experiment.add_figure(

@@ -163,7 +163,7 @@ class MaskedDataModule(SITSDataModule):
         batch_size: int = 32,
         prepare: bool = False,
         num_workers: int = 3,
-        ablation: float = 0.15,
+        ablation: float = 0.5
     ):
         super().__init__(
             join(data_root, "train", "features"),

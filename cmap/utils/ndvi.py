@@ -15,7 +15,7 @@ def plot_ndvi(
     days_mask: NDArray,
     removed_days_mask,
     pred: NDArray,
-    gd: NDArray,
+    gt: NDArray,
     nir_index: int = 6,
     red_index: int = 2,
     start_year: int = 2022,
@@ -23,9 +23,9 @@ def plot_ndvi(
     start_day: int = 1,
 ):
     days = days[days_mask]
-    gd = gd[days_mask]
+    gt = gt[days_mask]
     pred = pred[days_mask]
-    removed_days_mask = removed_days_mask[days_mask]
+    removed_days_mask = removed_days_mask[days_mask].astype('bool')
 
     dates = np.asarray(
         [
@@ -35,15 +35,15 @@ def plot_ndvi(
         dtype="datetime64[s]",
     )
 
-    ndvi_gd = ndvi(gd[:, red_index], gd[:, nir_index])
-    ndvi_mask = ndvi(gd[:, red_index], gd[:, nir_index])
+    ndvi_gt = ndvi(gt[:, red_index], gt[:, nir_index])
+    ndvi_mask = ndvi(gt[:, red_index], gt[:, nir_index])
     ndvi_pred = ndvi(pred[:, red_index], pred[:, nir_index])
     ndvi_mask[removed_days_mask] = 0
 
     data = pd.DataFrame(
         {
             "days": dates,
-            "gt": ndvi_gd,
+            "gt": ndvi_gt,
             "gt_masked": ndvi_mask,
             "pred": ndvi_pred,
         }
