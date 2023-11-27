@@ -107,7 +107,7 @@ class LabelledDataModule(SITSDataModule):
 
         # Label loading and code mapping
         labels = pd.concat(
-            [pd.read_csv(f, index_col=0) for f in glob(join(root, "*.csv"))]
+            [pd.read_csv(f, index_col=0) for f in glob(join(labels_root, "*.csv"))]
         )
         labels[LABEL_COL] = labels[LABEL_COL].map(
             lambda x: self.label_to_class.get(x, "other")

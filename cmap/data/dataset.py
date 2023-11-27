@@ -11,9 +11,16 @@ import torch
 from pandas.io.parsers.readers import TextFileReader
 from torch.utils.data import IterableDataset
 
-from cmap.utils.constants import (ALL_BANDS, CHUNK_ID_COL, DATE_COL, LABEL_COL,
-                                  POINT_ID_COL, SEASON_COL, SIZE_COL,
-                                  START_COL)
+from cmap.utils.constants import (
+    ALL_BANDS,
+    CHUNK_ID_COL,
+    DATE_COL,
+    LABEL_COL,
+    POINT_ID_COL,
+    SEASON_COL,
+    SIZE_COL,
+    START_COL,
+)
 
 logger = logging.getLogger("cmap.data.ChunkDataset")
 # logger.addHandler(logging.FileHandler("dataset.log"))
@@ -274,22 +281,16 @@ class ChunkMaskedDataset(ChunkDataset):
                 # Random masking of time stamps
                 ts_masked, loss_mask = self.random_masking(ts, sum(mask))
 
-                logger.debug(
-                    f"Shapes :\n\tdays\t: {days.shape}"
-                    + f"\n\tmask\t: {mask.shape}"
-                    + f"\n\tts\t: {ts.shape}"
-                    + f"\n\tts masked\t: {ts_masked.shape}"
-                    + f"\n\tloss mask\t: {loss_mask.shape}"
-                )
-
                 output = {
                     "days": days,
                     "ts": ts_masked,
                     "target": ts,
                     "mask": mask,
                     "loss_mask": loss_mask,
+                    "season": np.array([season]),
                 }
 
+                logger.debug({k: v.shape for k, v in output.items()})
                 logger.debug(output)
 
                 tensor_output = {

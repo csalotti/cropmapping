@@ -27,16 +27,19 @@ def plot_ndvi(
     pred = pred[days_mask]
     removed_days_mask = removed_days_mask[days_mask]
 
-    dates = np.asarray([
-        str(date(start_year, start_month, start_day) + timedelta(days=d))
-        for d in days.tolist()
-    ], dtype='datetime64[s]')
+    dates = np.asarray(
+        [
+            str(date(start_year, start_month, start_day) + timedelta(days=d))
+            for d in days.tolist()
+        ],
+        dtype="datetime64[s]",
+    )
 
     ndvi_gd = ndvi(gd[:, red_index], gd[:, nir_index])
     ndvi_mask = ndvi(gd[:, red_index], gd[:, nir_index])
     ndvi_pred = ndvi(pred[:, red_index], pred[:, nir_index])
     ndvi_mask[removed_days_mask] = 0
-    
+
     data = pd.DataFrame(
         {
             "days": dates,
@@ -54,6 +57,7 @@ def plot_ndvi(
         data=data,
         x="days",
         y="ndvi",
+        hue="source",
         style="source",
         markers=True,
         dashes=True,
