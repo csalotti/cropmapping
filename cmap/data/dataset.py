@@ -2,27 +2,18 @@ import logging
 from datetime import datetime
 from os.path import join
 from pprint import pformat
-from typing import Dict, List
 from random import random, sample
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 import torch
 from pandas.io.parsers.readers import TextFileReader
-from torch.nn.modules import loss
 from torch.utils.data import IterableDataset
 
-from utils.constants import (
-    ALL_BANDS,
-    CHUNK_ID_COL,
-    DATE_COL,
-    LABEL_COL,
-    POINT_ID_COL,
-    SEASON_COL,
-    SIZE_COL,
-    START_COL,
-)
-
+from cmap.utils.constants import (ALL_BANDS, CHUNK_ID_COL, DATE_COL, LABEL_COL,
+                                  POINT_ID_COL, SEASON_COL, SIZE_COL,
+                                  START_COL)
 
 logger = logging.getLogger("cmap.data.ChunkDataset")
 # logger.addHandler(logging.FileHandler("dataset.log"))

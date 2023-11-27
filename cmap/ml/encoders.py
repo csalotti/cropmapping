@@ -2,9 +2,9 @@ import logging
 from typing import List
 
 from torch import Tensor, nn
-from ml.embeddings.bands import PatchBandsEncoding
 
-from ml.embeddings.position import PositionalEncoding
+from cmap.ml.embeddings.bands import PatchBandsEncoding
+from cmap.ml.embeddings.position import PositionalEncoding
 
 logger = logging.getLogger("cmap.ml.encoders")
 

@@ -2,18 +2,16 @@ import logging
 from typing import List
 
 import numpy as np
-import seaborn as sns
 import pytorch_lightning as L
+import seaborn as sns
 import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR, LinearLR, SequentialLR
-from torchmetrics.classification import (
-    MulticlassConfusionMatrix,
-    MulticlassF1Score,
-)
+from torchmetrics.classification import (MulticlassConfusionMatrix,
+                                         MulticlassF1Score)
 
-from ml.losses import FocalLoss
+from cmap.ml.losses import FocalLoss
 
 logger = logging.getLogger("cmap.ml.modules")
 # logger.addHandler(logging.FileHandler("cmap.ml.modules.log"))

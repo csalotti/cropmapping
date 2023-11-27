@@ -1,10 +1,9 @@
 import logging
 
-
 import pytorch_lightning as L
 from pytorch_lightning.cli import LightningCLI
 
-from data.modules import SITSDataModule
+from cmap.data.modules import SITSDataModule
 
 # configure logging at the root level of Lightning
 logging.getLogger("cmap").setLevel(logging.DEBUG)

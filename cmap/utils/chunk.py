@@ -5,7 +5,8 @@ from os.path import join
 import pandas as pd
 from pandas.io.parquet import json
 
-from utils.constants import CHUNK_ID_COL, DATE_COL, POINT_ID_COL, SIZE_COL, START_COL
+from cmap.utils.constants import (CHUNK_ID_COL, DATE_COL, POINT_ID_COL,
+                                  SIZE_COL, START_COL)
 
 
 def chunks_indexing(chunks_root: str, write_csv: bool = False):

@@ -1,18 +1,17 @@
-from glob import glob
 import logging
+from glob import glob
 from os.path import join
-from types import prepare_class
 from typing import List
 
 import pandas as pd
 import pytorch_lightning as L
+import yaml
 from torch.utils.data import DataLoader
 from torch.utils.data.datapipes.iter.combinatorics import ShufflerIterDataPipe
-import yaml
 
-from utils.constants import LABEL_COL, POINT_ID_COL, SEASON_COL
-from data.dataset import ChunkLabeledDataset, ChunkMaskedDataset
-from utils.chunk import chunks_indexing
+from cmap.data.dataset import ChunkLabeledDataset, ChunkMaskedDataset
+from cmap.utils.chunk import chunks_indexing
+from cmap.utils.constants import LABEL_COL, POINT_ID_COL, SEASON_COL
 
 logger = logging.getLogger("cmap.data.module")
 # logger.addHandler(logging.FileHandler("datamodule.log"))
