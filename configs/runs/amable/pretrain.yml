@@ -7,6 +7,7 @@ data:
     data_root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_sorted
     num_workers: 32
     batch_size: 512
+    ablation: 0.5
 model:
   class_path: ml.autoencoders.AutoEncoder
   init_args:

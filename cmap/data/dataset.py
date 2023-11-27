@@ -81,7 +81,7 @@ class ChunkDataset(IterableDataset):
         )
         days_padded = np.pad(
             days_norm,
-            (self.max_n_days - n_days, 0),
+            (0, self.max_n_days - n_days),
             constant_values=0,
         )
         days_pad = self.max_n_days - n_days
