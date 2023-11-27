@@ -18,27 +18,28 @@ def plot_ndvi(
     gd: NDArray,
     nir_index: int = 6,
     red_index: int = 2,
-    start_year: int = 2023,
+    start_year: int = 2022,
     start_month: int = 11,
     start_day: int = 1,
 ):
     days = days[days_mask]
     gd = gd[days_mask]
-    pred = gd[days_mask]
+    pred = pred[days_mask]
+    removed_days_mask = removed_days_mask[days_mask]
 
-    doy = [
-        str(date(start_year, start_month, start_day) + timedelta(days=d))[5:]
-        for d in days
-    ]
+    dates = np.asarray([
+        str(date(start_year, start_month, start_day) + timedelta(days=d))
+        for d in days.tolist()
+    ], dtype='datetime64[s]')
 
     ndvi_gd = ndvi(gd[:, red_index], gd[:, nir_index])
     ndvi_mask = ndvi(gd[:, red_index], gd[:, nir_index])
     ndvi_pred = ndvi(pred[:, red_index], pred[:, nir_index])
     ndvi_mask[removed_days_mask] = 0
-
+    
     data = pd.DataFrame(
         {
-            "days": doy,
+            "days": dates,
             "gt": ndvi_gd,
             "gt_masked": ndvi_mask,
             "pred": ndvi_pred,
