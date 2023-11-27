@@ -2,14 +2,14 @@ import logging
 from typing import List
 
 import numpy as np
+from numpy.lib import append
 import pytorch_lightning as L
 import seaborn as sns
 import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR, LinearLR, SequentialLR
-from torchmetrics.classification import (MulticlassConfusionMatrix,
-                                         MulticlassF1Score)
+from torchmetrics.classification import MulticlassConfusionMatrix, MulticlassF1Score
 
 from cmap.ml.losses import FocalLoss
 
@@ -67,16 +67,19 @@ class Classifier(L.LightningModule):
 
         # data
         self.val_emb = []
+        self.val_batches = []
 
         # Layers
         self.encoder = encoder
         self.decoder = decoder
 
+        self.save_hyperparameters()
+
     def training_step(self, batch, batch_idx):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
 
         # Infer
-        ts_encoded = self.encoder(ts, days, mask)
+        ts_encoded = self.encoder(ts, days, ~mask)
         y_hat = self.decoder(ts_encoded, mask)
 
         # Reshape
@@ -129,7 +132,7 @@ class Classifier(L.LightningModule):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
 
         # Infer
-        ts_encoded = self.encoder(ts, days, mask)
+        ts_encoded = self.encoder(ts, days, ~mask)
         y_hat = self.decoder(ts_encoded, mask)
 
         # Reshape
@@ -151,11 +154,22 @@ class Classifier(L.LightningModule):
 
         self.val_conf_mat.update(y_hat, y)
 
+        # Save embeddings
         if self.current_epoch % 10 == 0:
             self.val_emb.append(
                 {
                     "embeddings": y_hat.cpu().numpy(),
                     "labels": [self.classes[yi] for yi in y.cpu().tolist()],
+                }
+            )
+
+        # Save data for attention maps
+        if batch_idx == 0:
+            self.val_batches.append(
+                {
+                    "days": days,
+                    "ts": ts,
+                    "y": y.cpu().numpy(),
                 }
             )
 
@@ -189,6 +203,9 @@ class Classifier(L.LightningModule):
                 metadata=metadata,
                 global_step=self.current_epoch,
             )
+
+        if len(self.val_batches) > 0:
+            batch = self.val_batches.pop()
 
         self.val_f1.reset()
         self.val_conf_mat.reset()

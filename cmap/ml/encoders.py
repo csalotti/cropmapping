@@ -2,6 +2,7 @@ import logging
 from typing import List
 
 from torch import Tensor, nn
+import torch
 
 from cmap.ml.embeddings.bands import PatchBandsEncoding
 from cmap.ml.embeddings.position import PositionalEncoding
@@ -47,6 +48,10 @@ class SITSFormer(nn.Module):
         )
         self.dropout = nn.Dropout(dropout_p)
 
+    @torch.no_grad()
+    def get_attention_maps(self, ts: Tensor, days: Tensor):
+        attention_maps = []
+
     def forward(self, ts: Tensor, days: Tensor, mask: Tensor):
         logger.debug(f"ts : {ts}\ndays : {days}\nmask : {mask}")
         x_position_emb = self.position_encoder(days)
@@ -58,7 +63,7 @@ class SITSFormer(nn.Module):
 
         # Transpose N and T for convenience in masking
         x_emb = x_emb.transpose(0, 1)
-        x_trans = self.transformer_encoder(x_emb, src_key_padding_mask=mask)
+        x_trans = self.transformer_encoder(x_emb, src_key_padding_mask=~mask)
         x_trans = x_trans.transpose(0, 1)
         logger.debug(f"Transformer: {x_trans}")
 
