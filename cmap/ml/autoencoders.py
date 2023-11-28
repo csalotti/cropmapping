@@ -58,8 +58,8 @@ class AutoEncoder(L.LightningModule):
             {
                 "Losses/train": loss,
             },
-            on_step=True,
-            on_epoch=False,
+            on_step=False,
+            on_epoch=True
         )
         return loss
 
@@ -78,8 +78,8 @@ class AutoEncoder(L.LightningModule):
             {
                 "Losses/val": loss,
             },
-            on_step=True,
-            on_epoch=False,
+            on_step=False,
+            on_epoch=True
         )
 
         if len(self.val_data) == 0:

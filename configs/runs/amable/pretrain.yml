@@ -2,15 +2,14 @@ trainer:
   callbacks: pytorch_lightning.callbacks.LearningRateMonitor
   max_epochs: 200
   precision : 16-mixed
-  accumulate_grad_batches: 7
+  accumulate_grad_batches: 10
 data:
   class_path: cmap.data.modules.MaskedDataModule
   init_args:
     data_root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_sorted
     num_workers: 20
-    batch_size: 512
-    ablation: 0.15
-    sample: 0.1
+    batch_size: 1024
+    ablation: 0.3
 model:
   class_path: cmap.ml.autoencoders.AutoEncoder
   init_args:
