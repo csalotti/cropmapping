@@ -6,6 +6,7 @@ import torch
 
 from cmap.ml.embeddings.bands import PatchBandsEncoding
 from cmap.ml.embeddings.position import PositionalEncoding
+from cmap.utils.attention import SaveAttentionMapHook, patch_attention
 
 logger = logging.getLogger("cmap.ml.encoders")
 
@@ -46,11 +47,31 @@ class SITSFormer(nn.Module):
             num_layers=n_att_layers,
             norm=encoder_norm,
         )
+
         self.dropout = nn.Dropout(dropout_p)
 
+        self.__patch_attention()
+
+    def __patch_attention(self):
+        for l in self.transformer_encoder.layers:
+            patch_attention(l.self_attention)
+
     @torch.no_grad()
-    def get_attention_maps(self, ts: Tensor, days: Tensor):
-        attention_maps = []
+    def get_attention_maps(self, ts: Tensor, days: Tensor, mask: Tensor):
+        outpout_hook = SaveAttentionMapHook()
+        hooks_handles = [
+            l.self_attn.register_forward_hook(outpout_hook)
+            for l in self.transformer_encoder.layers
+        ]
+        self.forward(ts=ts, mask=mask, days=days)
+        for h in hooks_handles:
+            h.remove()
+
+        outputs = outpout_hook.outputs
+        # Merge layers on dim 1
+        outputs = torch.concatenate([o.unsqueeze(1) for o in outputs], dim=1)
+
+        return outputs
 
     def forward(self, ts: Tensor, days: Tensor, mask: Tensor):
         logger.debug(f"ts : {ts}\ndays : {days}\nmask : {mask}")
@@ -63,7 +84,7 @@ class SITSFormer(nn.Module):
 
         # Transpose N and T for convenience in masking
         x_emb = x_emb.transpose(0, 1)
-        x_trans = self.transformer_encoder(x_emb, src_key_padding_mask=~mask)
+        x_trans = self.transformer_encoder(x_emb, src_key_padding_mask=mask)
         x_trans = x_trans.transpose(0, 1)
         logger.debug(f"Transformer: {x_trans}")
 
