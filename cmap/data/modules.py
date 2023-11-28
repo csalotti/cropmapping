@@ -163,7 +163,8 @@ class MaskedDataModule(SITSDataModule):
         batch_size: int = 32,
         prepare: bool = False,
         num_workers: int = 3,
-        ablation: float = 0.5
+        sample: float = 1.0,
+        ablation: float = 0.5,
     ):
         super().__init__(
             join(data_root, "train", "features"),
@@ -174,9 +175,12 @@ class MaskedDataModule(SITSDataModule):
         )
 
         self.ablation = ablation
+        self.sample = sample
 
     def get_dataset(self, features_root):
-        indexes = pd.read_json(join(features_root, "indexes.json"))
+        indexes = pd.read_json(join(features_root, "indexes.json")).sample(
+            frac=self.sample
+        )
         return ChunkMaskedDataset(
             features_root=features_root,
             indexes=indexes,
