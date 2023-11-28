@@ -40,7 +40,7 @@ class AutoEncoder(L.LightningModule):
         # data
         self.ndvi_sample = ndvi_sample
         self.val_data = []
-
+        self.plot_indexes = []
         self.save_hyperparameters()
 
     def training_step(self, batch, batch_idx):
@@ -52,7 +52,7 @@ class AutoEncoder(L.LightningModule):
         ts_hat = self.decoder(ts_encoded)
 
         loss = self.criterion(ts_hat, target)
-        loss = (loss.mean(dim=-1) * loss_mask.float()).sum() / loss_mask.sum()
+        loss = (loss * loss_mask.unsqueeze(-1).float()).sum() / loss_mask.sum()
 
         self.log_dict(
             {
@@ -72,7 +72,7 @@ class AutoEncoder(L.LightningModule):
         ts_hat = self.decoder(ts_encoded)
 
         loss = self.criterion(ts_hat, target)
-        loss = (loss.mean(dim=-1) * loss_mask.float()).sum() / loss_mask.sum()
+        loss = (loss * loss_mask.unsqueeze(-1).float()).sum() / loss_mask.sum()
 
         self.log_dict(
             {
@@ -82,19 +82,22 @@ class AutoEncoder(L.LightningModule):
             on_epoch=False,
         )
 
-        if len(self.val_data) == 0 and random() > 0.75:
+        if len(self.val_data) == 0:
             batch_size = ts.shape[0]
-            indexes = np.random.choice(
-                range(batch_size), min(self.ndvi_sample, batch_size)
-            )
+
+            if len(self.plot_indexes) == 0:
+                self.plot_indexes = np.random.choice(
+                    range(batch_size), min(self.ndvi_sample, batch_size)
+                )
+
             self.val_data.append(
                 {
-                    "target": target.cpu().numpy()[indexes, :, :],
-                    "ts_hat": ts_hat.cpu().numpy()[indexes, :, :],
-                    "days": days.cpu().numpy()[indexes, :],
-                    "mask": mask.cpu().numpy()[indexes, :],
-                    "loss_mask": loss_mask.cpu().numpy()[indexes, :],
-                    "season": seasons.cpu().numpy()[indexes, :],
+                    "target": target.cpu().numpy()[self.plot_indexes, :, :],
+                    "ts_hat": ts_hat.cpu().numpy()[self.plot_indexes, :, :],
+                    "days": days.cpu().numpy()[self.plot_indexes, :],
+                    "mask": mask.cpu().numpy()[self.plot_indexes, :],
+                    "loss_mask": loss_mask.cpu().numpy()[self.plot_indexes, :],
+                    "season": seasons.cpu().numpy()[self.plot_indexes, :],
                 }
             )
 

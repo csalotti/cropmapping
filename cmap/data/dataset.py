@@ -26,7 +26,7 @@ logger = logging.getLogger("cmap.data.ChunkDataset")
 # logger.addHandler(logging.FileHandler("dataset.log"))
 REFERENCE_YEAR = 2023
 MIN_DAYS = 3
-SEASONS = [2017, 2018, 2019, 2020, 2021, 2022]
+SEASONS = [2018, 2019, 2020, 2021, 2022]
 
 
 class ChunkDataset(IterableDataset):
