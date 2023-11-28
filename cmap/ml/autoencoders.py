@@ -114,6 +114,7 @@ class AutoEncoder(L.LightningModule):
                     removed_days_mask=batch["loss_mask"][i],
                     pred=batch["ts_hat"][i],
                     gt=batch["target"][i],
+                    start_year=int(batch["season"][i][0]) - 1,
                 )
 
                 self.logger.experiment.add_figure(
