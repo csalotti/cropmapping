@@ -36,15 +36,13 @@ def plot_ndvi(
     )
 
     ndvi_gt = ndvi(gt[:, red_index], gt[:, nir_index])
-    ndvi_mask = ndvi(gt[:, red_index], gt[:, nir_index])
     ndvi_pred = ndvi(pred[:, red_index], pred[:, nir_index])
-    ndvi_mask[removed_days_mask] = 0
+    ndvi_pred[~removed_days_mask] = ndvi_gt[~removed_days_mask]
 
     data = pd.DataFrame(
         {
             "days": dates,
             "gt": ndvi_gt,
-            "gt_masked": ndvi_mask,
             "pred": ndvi_pred,
         }
     ).melt(

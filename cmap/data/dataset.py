@@ -115,7 +115,6 @@ class ChunkDataset(IterableDataset):
         )
 
         workers_chunks = sub_indexes_df[CHUNK_ID_COL].unique()
-        np.random.shuffle(workers_chunks)
 
         for chunk_id in workers_chunks:
             chunk_reader = self._read_chunk(chunk_id)
