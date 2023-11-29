@@ -6,7 +6,7 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR, LinearLR, SequentialLR
 
 from cmap.utils.ndvi import plot_ndvi
-from cmap.utils.attention import plot_attention
+from cmap.utils.attention import plot_attention, patch_attention
 
 class AutoEncoder(L.LightningModule):
     def __init__(
@@ -41,7 +41,8 @@ class AutoEncoder(L.LightningModule):
         self.ndvi_sample = ndvi_sample
         self.val_data = []
         self.plot_indexes = []
-        self.save_hyperparameters()
+        
+        self.save_hyperparameters(ignore=['encoder', 'decoder', 'criterion'])
 
     def training_step(self, batch, batch_idx):
         ts, days, target, mask, loss_mask, _ = [
@@ -62,6 +63,12 @@ class AutoEncoder(L.LightningModule):
             on_epoch=True
         )
         return loss
+
+    def _get_attention_maps(self, ts, days, mask):
+        for l in self.encoder.transformer_encoder.layers:
+            patch_attention(l.self_attn)
+
+        return self.encoder.get_attention_maps(ts, days, mask)
 
     def validation_step(self, batch, batch_idx):
         ts, days, target, mask, loss_mask, seasons = [
@@ -90,7 +97,7 @@ class AutoEncoder(L.LightningModule):
                     range(batch_size), min(self.ndvi_sample, batch_size)
                 )
 
-            attn_maps = self.encoder.get_attention_maps(ts, days, mask)
+            attn_maps = self._get_attention_maps(ts, days, mask)
             self.val_data.append(
                 {
                     "target": target.cpu().numpy()[self.plot_indexes, :, :],

@@ -51,13 +51,8 @@ class SITSFormer(nn.Module):
         self.dropout = nn.Dropout(dropout_p)
 
 
-    def __patch_attention(self):
-        for l in self.transformer_encoder.layers:
-            patch_attention(l.self_attn)
-
     @torch.no_grad()
     def get_attention_maps(self, ts: Tensor, days: Tensor, mask: Tensor):
-        self.__patch_attention()
         outpout_hook = SaveAttentionMapHook()
         hooks_handles = [
             l.self_attn.register_forward_hook(outpout_hook)
