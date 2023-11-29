@@ -6,7 +6,7 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR, LinearLR, SequentialLR
 
 from cmap.utils.ndvi import plot_ndvi
-
+from cmap.utils.attention import plot_attention
 
 class AutoEncoder(L.LightningModule):
     def __init__(
@@ -90,12 +90,14 @@ class AutoEncoder(L.LightningModule):
                     range(batch_size), min(self.ndvi_sample, batch_size)
                 )
 
+            attn_maps = self.encoder.get_attention_maps(ts, days, mask)
             self.val_data.append(
                 {
                     "target": target.cpu().numpy()[self.plot_indexes, :, :],
                     "ts_hat": ts_hat.cpu().numpy()[self.plot_indexes, :, :],
                     "days": days.cpu().numpy()[self.plot_indexes, :],
                     "mask": mask.cpu().numpy()[self.plot_indexes, :],
+                    "attn_maps" : attn_maps.cpu().numpy()[self.plot_indexes, :],
                     "loss_mask": loss_mask.cpu().numpy()[self.plot_indexes, :],
                     "season": seasons.cpu().numpy()[self.plot_indexes, :],
                 }
@@ -117,9 +119,21 @@ class AutoEncoder(L.LightningModule):
                     start_year=int(batch["season"][i][0]) - 1,
                 )
 
+                att_fig = plot_attention(
+                        attention_map=batch['attn_maps'][i],
+                        days=batch['days'][i],
+                        mask=batch['mask'][i],
+                        )
+
                 self.logger.experiment.add_figure(
                     f"NDVI/sample_{i}",
                     ndvi_fig,
+                    self.current_epoch,
+                )
+                
+                self.logger.experiment.add_figure(
+                    f"Attention Maps/sample_{i}",
+                    att_fig,
                     self.current_epoch,
                 )
 

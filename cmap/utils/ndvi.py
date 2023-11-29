@@ -5,6 +5,7 @@ import pandas as pd
 import seaborn as sns
 from numpy.typing import NDArray
 
+import matplotlib.pyplot as plt
 
 def ndvi(red: NDArray, nir: NDArray):
     return np.where(nir != 0, (nir - red) / (nir + red), 0)
@@ -51,6 +52,8 @@ def plot_ndvi(
         value_name="ndvi",
     )
 
+    fig, ax = plt.subplots()
+
     g = sns.lineplot(
         data=data,
         x="days",
@@ -59,8 +62,9 @@ def plot_ndvi(
         style="source",
         markers=True,
         dashes=True,
+        ax=ax
     )
 
     g.tick_params(axis="x", labelrotation=45)
 
-    return g.get_figure()
+    return fig

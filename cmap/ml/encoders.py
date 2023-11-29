@@ -50,14 +50,14 @@ class SITSFormer(nn.Module):
 
         self.dropout = nn.Dropout(dropout_p)
 
-        self.__patch_attention()
 
     def __patch_attention(self):
         for l in self.transformer_encoder.layers:
-            patch_attention(l.self_attention)
+            patch_attention(l.self_attn)
 
     @torch.no_grad()
     def get_attention_maps(self, ts: Tensor, days: Tensor, mask: Tensor):
+        self.__patch_attention()
         outpout_hook = SaveAttentionMapHook()
         hooks_handles = [
             l.self_attn.register_forward_hook(outpout_hook)
@@ -84,7 +84,7 @@ class SITSFormer(nn.Module):
 
         # Transpose N and T for convenience in masking
         x_emb = x_emb.transpose(0, 1)
-        x_trans = self.transformer_encoder(x_emb, src_key_padding_mask=mask)
+        x_trans = self.transformer_encoder(x_emb, src_key_padding_mask=~mask)
         x_trans = x_trans.transpose(0, 1)
         logger.debug(f"Transformer: {x_trans}")
 

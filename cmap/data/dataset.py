@@ -246,17 +246,17 @@ class ChunkMaskedDataset(ChunkDataset):
         days_masked = np.array([0] * self.max_n_days)
         n_removed_days = int(self.ablation * ts_length)
 
-        if random() < 0.5:
-            start_idx = np.random.choice(range(ts_length - n_removed_days), 1)[0]
-            days_masked[start_idx : start_idx + n_removed_days] = 1
-            ts_masked[start_idx : start_idx + n_removed_days] = self.mask
-        else:
-            indexes = np.random.choice(
-                range(ts_length),
-                n_removed_days,
-            )
-            days_masked[indexes] = 1
-            ts_masked[indexes] = self.mask
+        # if random() < 0.5:
+        #     start_idx = np.random.choice(range(ts_length - n_removed_days), 1)[0]
+        #     days_masked[start_idx : start_idx + n_removed_days] = 1
+        #     ts_masked[start_idx : start_idx + n_removed_days] = self.mask
+        # else:
+        indexes = np.random.choice(
+            range(ts_length),
+            n_removed_days,
+        )
+        days_masked[indexes] = 1
+        ts_masked[indexes] = self.mask
 
         return ts_masked, days_masked
 
