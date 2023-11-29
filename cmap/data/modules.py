@@ -1,8 +1,10 @@
 import json
 import logging
 from glob import glob
-from os.path import join
+from os.path import join, basename
+import shutil
 from typing import List
+from functools import partial
 
 import pandas as pd
 import pytorch_lightning as L
@@ -14,8 +16,8 @@ from torch.utils.data.datapipes.iter.combinatorics import ShufflerIterDataPipe
 from cmap.data.dataset import ChunkLabeledDataset, ChunkMaskedDataset
 import os
 from glob import glob
-from cmap.utils.chunk import chunks_indexing, preprocessing
-from cmap.utils.constants import LABEL_COL, POINT_ID_COL, SEASON_COL
+from cmap.utils.chunk import preprocessing
+from cmap.utils.constants import LABEL_COL, POINT_ID_COL, SEASON_COL, CHUNK_ID_COL, DATE_COL
 
 logger = logging.getLogger("cmap.data.module")
 # logger.addHandler(logging.FileHandler("datamodule.log"))
@@ -30,59 +32,46 @@ class SITSDataModule(L.LightningDataModule):
         prepare: bool = False,
         num_workers: int = 3,
         raw_data_root: str = os.environ.get("RAW_DATA_ROOT", ""),
-        include_temp: bool = False,
     ):
         L.LightningDataModule.__init__(self)
 
-        self.train_features_root = train_features_root
-        self.val_features_root = val_features_root
+        self.features_roots = {
+                "train" : train_features_root,
+                "eval" : val_features_root,
+                }
         self.batch_size = batch_size
         self.prepare = prepare
         self.raw_data_root = raw_data_root
         self.num_workers = num_workers
-        self.include_temp = include_temp
 
-    def _prepare_chunk(self, chunk_id):
-        stage = "train" if chunk_id <= 80 else "eval"
-        features_df = pd.read_csv(
-            join(self.raw_data_root, stage, "features", f"chunk_{chunk_id}")
-        )
-        temp_files = []
-        if self.include_temp:
-            temp_files = glob(
-                join(
-                    self.raw_data_root,
-                    "temperatures",
-                    chunk_id,
-                    "*.csv",
-                )
-            )
+    def _prepare_chunk(self, chunk_file, stage):
+        features_df = pd.read_csv(chunk_file, index_col=0, parse_dates=[DATE_COL])
+        chunk_id = features_df[CHUNK_ID_COL].iloc[0]
 
-        indexes, features_df = preprocessing(features_df, temp_files)
+
+        indexes, features_df = preprocessing(features_df)
 
         features_df.to_csv(
-            join(self.train_features_root, "features", f"chunk_{chunk_id}")
+            join(self.features_roots[stage], f"chunk_{chunk_id}.csv"),
         )
         return indexes
 
     def prepare_data(self) -> None:
         if self.prepare:
-            with multiprocessing.Pool() as pool:
-                indexes_map = pool.map(self._prepare_chunk, range(100))
+            for stage in ['train', 'eval']:
+                os.makedirs(self.features_roots[stage], exist_ok=True)
 
-            train_indexes = []
-            val_indexes = []
-            for i, ind in enumerate(indexes_map):
-                if i <= 80:
-                    train_indexes.extend(ind)
-                else:
-                    val_indexes.extend(ind)
+                with multiprocessing.Pool(int(os.environ.get("N_PROCESSES", 10))) as p:
+                    chunk_files = glob(join(self.raw_data_root, stage, "features", "*.csv"))
+                    prepare_fn = partial(self._prepare_chunk, stage=stage)
+                    chunk_indexes = p.map(prepare_fn, chunk_files)
 
-            with open(join(self.train_features_root, "indexes.json"), "r") as f:
-                json.dump(train_indexes, f)
+                indexes =[]
+                for ci in chunk_indexes:
+                    indexes.extend(ci)
 
-            with open(join(self.val_features_root, "indexes.json"), "r") as f:
-                json.dump(val_indexes, f)
+                with open(join(self.features_roots[stage], "indexes.json"), "w") as f:
+                    json.dump(indexes, f)
 
     def setup(self, stage: str) -> None:
         raise NotImplementedError("Datamodule subclasses must implement setup")
@@ -124,6 +113,7 @@ class LabelledDataModule(SITSDataModule):
         num_workers: int = 3,
         records_frac: float = 1,
         subsample: bool = False,
+        raw_data_root: str = os.environ.get("RAW_DATA_ROOT", ""),
     ):
         super().__init__(
             join(data_root, "train", "features"),
@@ -131,10 +121,13 @@ class LabelledDataModule(SITSDataModule):
             batch_size,
             prepare,
             num_workers,
+            raw_data_root,
         )
 
-        self.train_label_root = join(data_root, "train", "label")
-        self.val_label_root = join(data_root, "val", "label")
+        self.labels_roots = {
+                "train" : join(data_root, "train", "labels"),
+                "eval" : join(data_root, "eval", "labels"),
+                }
         self.classes = classes
         self.classes_config = classes_config
         self.subsample = subsample
@@ -146,6 +139,12 @@ class LabelledDataModule(SITSDataModule):
         with open(self.classes_config, "r") as f:
             class_to_label = yaml.safe_load(f)
             self.label_to_class = {v: k for k, vs in class_to_label.items() for v in vs}
+
+        if self.prepare :
+            for stage in ['train', 'eval']:
+                for f in glob(join(self.raw_data_root, stage, "labels", "*.csv")):
+                    new_path =  join(self.labels_root[stage], basename(f))
+                    shutil(f,new_path)
 
     def get_dataset(self, features_root, labels_root: str):
         indexes = pd.read_json(join(features_root, "indexes.json"))
@@ -190,12 +189,12 @@ class LabelledDataModule(SITSDataModule):
     def setup(self, stage: str):
         if stage == "fit":
             self.train_dataset = self.get_dataset(
-                self.train_features_root,
-                self.train_label_root,
+                self.features_roots['train'],
+                self.labels_roots['train'],
             )
             self.val_dataset = self.get_dataset(
-                self.val_features_root,
-                self.val_label_root,
+                self.features_root['eval'],
+                self.labels_roots['eval'],
             )
         else:
             raise NotImplementedError("No implementation for stage {stage}")
@@ -210,6 +209,7 @@ class MaskedDataModule(SITSDataModule):
         num_workers: int = 3,
         sample: float = 1.0,
         ablation: float = 0.15,
+        raw_data_root: str = os.environ.get("RAW_DATA_ROOT", ""),
     ):
         super().__init__(
             join(data_root, "train", "features"),
@@ -217,6 +217,7 @@ class MaskedDataModule(SITSDataModule):
             batch_size,
             prepare,
             num_workers,
+            raw_data_root,
         )
 
         self.ablation = ablation
@@ -234,7 +235,7 @@ class MaskedDataModule(SITSDataModule):
 
     def setup(self, stage: str):
         if stage == "fit":
-            self.train_dataset = self.get_dataset(self.train_features_root)
-            self.val_dataset = self.get_dataset(self.val_features_root)
+            self.train_dataset = self.get_dataset(self.features_roots['train'])
+            self.eval_dataset = self.get_dataset(self.features_roots['eval'])
         else:
             raise NotImplementedError("No implementation for stage {stage}")

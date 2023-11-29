@@ -43,7 +43,7 @@ def get_temperatures(temp_files):
         df = pd.read_csv(csv_file, index_col=0).rename(columns={"id_point": "poi_id"})
 
         # Extract the date from the file name
-        date = csv_file[:-4]  # Remove the '.csv' extension
+        date = basename(csv_file)[:-4]  # Remove the '.csv' extension
         df["date"] = pd.to_datetime(date)
 
         # Append the DataFrame to the combined_data DataFrame
@@ -55,14 +55,6 @@ def get_temperatures(temp_files):
 
 
 def preprocessing(features_df, temp_files=[]):
-    if len(temp_files) > 0:
-        temps_df = get_temperatures(temp_files)
-        features_df = pd.merge(
-            features_df,
-            temps_df,
-            on=["date", "poi_id"],
-            how="inner",
-        )
     indexes_df, features_df = get_indexes(features_df)
 
     indexes_json = indexes_df.reset_index()[
