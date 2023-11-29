@@ -17,7 +17,13 @@ from cmap.data.dataset import ChunkLabeledDataset, ChunkMaskedDataset
 import os
 from glob import glob
 from cmap.utils.chunk import preprocessing
-from cmap.utils.constants import LABEL_COL, POINT_ID_COL, SEASON_COL, CHUNK_ID_COL, DATE_COL
+from cmap.utils.constants import (
+    LABEL_COL,
+    POINT_ID_COL,
+    SEASON_COL,
+    CHUNK_ID_COL,
+    DATE_COL,
+)
 
 logger = logging.getLogger("cmap.data.module")
 # logger.addHandler(logging.FileHandler("datamodule.log"))
@@ -36,9 +42,9 @@ class SITSDataModule(L.LightningDataModule):
         L.LightningDataModule.__init__(self)
 
         self.features_roots = {
-                "train" : train_features_root,
-                "eval" : val_features_root,
-                }
+            "train": train_features_root,
+            "eval": val_features_root,
+        }
         self.batch_size = batch_size
         self.prepare = prepare
         self.raw_data_root = raw_data_root
@@ -47,7 +53,6 @@ class SITSDataModule(L.LightningDataModule):
     def _prepare_chunk(self, chunk_file, stage):
         features_df = pd.read_csv(chunk_file, index_col=0, parse_dates=[DATE_COL])
         chunk_id = features_df[CHUNK_ID_COL].iloc[0]
-
 
         indexes, features_df = preprocessing(features_df)
 
@@ -58,15 +63,17 @@ class SITSDataModule(L.LightningDataModule):
 
     def prepare_data(self) -> None:
         if self.prepare:
-            for stage in ['train', 'eval']:
+            for stage in ["train", "eval"]:
                 os.makedirs(self.features_roots[stage], exist_ok=True)
 
                 with multiprocessing.Pool(int(os.environ.get("N_PROCESSES", 10))) as p:
-                    chunk_files = glob(join(self.raw_data_root, stage, "features", "*.csv"))
+                    chunk_files = glob(
+                        join(self.raw_data_root, stage, "features", "*.csv")
+                    )
                     prepare_fn = partial(self._prepare_chunk, stage=stage)
                     chunk_indexes = p.map(prepare_fn, chunk_files)
 
-                indexes =[]
+                indexes = []
                 for ci in chunk_indexes:
                     indexes.extend(ci)
 
@@ -125,9 +132,9 @@ class LabelledDataModule(SITSDataModule):
         )
 
         self.labels_roots = {
-                "train" : join(data_root, "train", "labels"),
-                "eval" : join(data_root, "eval", "labels"),
-                }
+            "train": join(data_root, "train", "labels"),
+            "eval": join(data_root, "eval", "labels"),
+        }
         self.classes = classes
         self.classes_config = classes_config
         self.subsample = subsample
@@ -140,11 +147,11 @@ class LabelledDataModule(SITSDataModule):
             class_to_label = yaml.safe_load(f)
             self.label_to_class = {v: k for k, vs in class_to_label.items() for v in vs}
 
-        if self.prepare :
-            for stage in ['train', 'eval']:
+        if self.prepare:
+            for stage in ["train", "eval"]:
                 for f in glob(join(self.raw_data_root, stage, "labels", "*.csv")):
-                    new_path =  join(self.labels_root[stage], basename(f))
-                    shutil(f,new_path)
+                    new_path = join(self.labels_roots[stage], basename(f))
+                    shutil.copy(f, new_path)
 
     def get_dataset(self, features_root, labels_root: str):
         indexes = pd.read_json(join(features_root, "indexes.json"))
@@ -189,12 +196,12 @@ class LabelledDataModule(SITSDataModule):
     def setup(self, stage: str):
         if stage == "fit":
             self.train_dataset = self.get_dataset(
-                self.features_roots['train'],
-                self.labels_roots['train'],
+                self.features_roots["train"],
+                self.labels_roots["train"],
             )
             self.val_dataset = self.get_dataset(
-                self.features_root['eval'],
-                self.labels_roots['eval'],
+                self.features_root["eval"],
+                self.labels_roots["eval"],
             )
         else:
             raise NotImplementedError("No implementation for stage {stage}")
@@ -235,7 +242,7 @@ class MaskedDataModule(SITSDataModule):
 
     def setup(self, stage: str):
         if stage == "fit":
-            self.train_dataset = self.get_dataset(self.features_roots['train'])
-            self.eval_dataset = self.get_dataset(self.features_roots['eval'])
+            self.train_dataset = self.get_dataset(self.features_roots["train"])
+            self.eval_dataset = self.get_dataset(self.features_roots["eval"])
         else:
             raise NotImplementedError("No implementation for stage {stage}")

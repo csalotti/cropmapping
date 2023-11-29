@@ -12,6 +12,7 @@ from torch.optim.lr_scheduler import ExponentialLR, LinearLR, SequentialLR
 from torchmetrics.classification import MulticlassConfusionMatrix, MulticlassF1Score
 
 from cmap.ml.losses import FocalLoss
+from cmap.utils.attention import patch_attention, plot_attention
 
 logger = logging.getLogger("cmap.ml.modules")
 # logger.addHandler(logging.FileHandler("cmap.ml.modules.log"))
@@ -128,6 +129,12 @@ class Classifier(L.LightningModule):
         self.train_f1.reset()
         self.train_conf_mat.reset()
 
+    def _get_attention_maps(self, ts, days, mask):
+        for l in self.encoder.transformer_encoder.layers:
+            patch_attention(l.self_attn)
+
+        return self.encoder.get_attention_maps(ts, days, mask)
+
     def validation_step(self, batch, batch_idx):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
 
@@ -165,11 +172,14 @@ class Classifier(L.LightningModule):
 
         # Save data for attention maps
         if batch_idx == 0:
+            attn_maps = self._get_attention_maps(ts, days, ~mask)
             self.val_batches.append(
                 {
-                    "days": days,
-                    "ts": ts,
+                    "days": days.cpu().numpy(),
+                    "ts": ts.cpu().numpy(),
                     "y": y.cpu().numpy(),
+                    "mask": mask.cpu().numpy(),
+                    "attn_maps": attn_maps.numpy(),
                 }
             )
 
@@ -206,6 +216,24 @@ class Classifier(L.LightningModule):
 
         if len(self.val_batches) > 0:
             batch = self.val_batches.pop()
+            attn_maps, days, mask, y = [
+                batch[k] for k in ["attn_maps", "days", "mask", "y"]
+            ]
+            _, class_occ_index = np.unique(y, return_index=True)
+            for i in class_occ_index:
+                class_name = self.classes[i]
+                attn_fig = plot_attention(
+                    attn_maps[i],
+                    days[i],
+                    mask[i],
+                    class_name,
+                )
+
+                self.logger.experiment.add_figure(
+                    f"Attention Maps/{class_name}",
+                    attn_fig,
+                    self.current_epoch,
+                )
 
         self.val_f1.reset()
         self.val_conf_mat.reset()
