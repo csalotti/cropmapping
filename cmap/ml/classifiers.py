@@ -74,13 +74,13 @@ class Classifier(L.LightningModule):
         self.encoder = encoder
         self.decoder = decoder
 
-        self.save_hyperparameters(ignore=['encoder', 'decoder'])
+        self.save_hyperparameters(ignore=["encoder", "decoder"])
 
     def training_step(self, batch, batch_idx):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
 
         # Infer
-        ts_encoded = self.encoder(ts, days, ~mask)
+        ts_encoded = self.encoder(ts, days, mask)
         y_hat = self.decoder(ts_encoded, mask)
 
         # Reshape
@@ -139,7 +139,7 @@ class Classifier(L.LightningModule):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
 
         # Infer
-        ts_encoded = self.encoder(ts, days, ~mask)
+        ts_encoded = self.encoder(ts, days, mask)
         y_hat = self.decoder(ts_encoded, mask)
 
         # Reshape
@@ -172,7 +172,7 @@ class Classifier(L.LightningModule):
 
         # Save data for attention maps
         if batch_idx == 0:
-            attn_maps = self._get_attention_maps(ts, days, ~mask)
+            attn_maps = self._get_attention_maps(ts, days, mask)
             self.val_batches.append(
                 {
                     "days": days.cpu().numpy(),
@@ -219,7 +219,7 @@ class Classifier(L.LightningModule):
             attn_maps, days, mask, y = [
                 batch[k] for k in ["attn_maps", "days", "mask", "y"]
             ]
-            class_ids, idxs = np.unique(y, return_index=True) 
+            class_ids, idxs = np.unique(y, return_index=True)
             for ci, i in zip(class_ids, idxs):
                 class_name = self.classes[ci]
                 attn_fig = plot_attention(

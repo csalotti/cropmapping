@@ -83,7 +83,7 @@ class ChunkDataset(IterableDataset):
             constant_values=0,
         )
         days_pad = self.max_n_days - n_days
-        mask = np.array([True] * n_days + [False] * days_pad)
+        mask = np.array([1] * n_days + [0] * days_pad)
 
         return ts_padded, days_padded, mask
 

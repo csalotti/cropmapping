@@ -68,6 +68,8 @@ class SITSFormer(nn.Module):
         return outputs
 
     def forward(self, ts: Tensor, days: Tensor, mask: Tensor):
+        mask = mask == 0
+
         logger.debug(f"ts : {ts}\ndays : {days}\nmask : {mask}")
         x_position_emb = self.position_encoder(days)
         x_bands_emb = self.bands_encoder(ts)

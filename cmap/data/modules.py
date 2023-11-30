@@ -9,6 +9,7 @@ from functools import partial
 import pandas as pd
 import pytorch_lightning as L
 import multiprocessing
+import torch
 import yaml
 from torch.utils.data import DataLoader
 from torch.utils.data.datapipes.iter.combinatorics import ShufflerIterDataPipe
@@ -95,7 +96,7 @@ class SITSDataModule(L.LightningDataModule):
             persistent_workers=True,
             shuffle=True,
             drop_last=True,
-            pin_memory=self.trainer.num_devices > 0,
+            pin_memory=torch.cuda.is_available(),
         )
 
     def val_dataloader(self):
@@ -105,7 +106,7 @@ class SITSDataModule(L.LightningDataModule):
             num_workers=self.num_workers,
             persistent_workers=True,
             drop_last=True,
-            pin_memory=self.trainer.num_devices > 0,
+            pin_memory=torch.cuda.is_available(),
         )
 
 
