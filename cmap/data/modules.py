@@ -244,6 +244,6 @@ class MaskedDataModule(SITSDataModule):
     def setup(self, stage: str):
         if stage == "fit":
             self.train_dataset = self.get_dataset(self.features_roots["train"])
-            self.eval_dataset = self.get_dataset(self.features_roots["eval"])
+            self.val_dataset = self.get_dataset(self.features_roots["eval"])
         else:
             raise NotImplementedError("No implementation for stage {stage}")

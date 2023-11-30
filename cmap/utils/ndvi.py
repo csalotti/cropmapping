@@ -23,6 +23,7 @@ def plot_ndvi(
     start_month: int = 11,
     start_day: int = 1,
 ):
+    days_mask = days_mask == 1
     days = days[days_mask]
     gt = gt[days_mask]
     pred = pred[days_mask]
