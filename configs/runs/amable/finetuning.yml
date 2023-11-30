@@ -1,12 +1,14 @@
 trainer:
   callbacks: pytorch_lightning.callbacks.LearningRateMonitor
   max_epochs: 30
+  precision : 16-mixed
 data:
-  class_path: data.modules.LabelledDataModule
+  class_path: cmap.data.modules.LabelledDataModule
   init_args:
     data_root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_sorted
-    num_workers: 32
+    num_workers: 20
     batch_size: 512
+    subsample: true
     classes:
       - other
       - ble_dur
@@ -16,10 +18,10 @@ data:
       - mais
       - tournesol
 model:
-  class_path: ml.classifiers.Classifier
+  class_path: cmap.ml.classifiers.Classifier
   init_args:
     encoder:
-      class_path : ml.encoders.SITSFormer
+      class_path : cmap.ml.encoders.SITSFormer
       init_args:
         max_n_days: 397
         d_model: 256
@@ -33,7 +35,7 @@ model:
         n_att_layers: 4
         dropout_p: 0.1
     decoder:
-      class_path: ml.decoders.MulticlassClassification      
+      class_path: cmap.ml.decoders.MulticlassClassification      
       init_args:
         hidden: 256 
         num_classes: 7

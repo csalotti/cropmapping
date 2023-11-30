@@ -200,7 +200,7 @@ class LabelledDataModule(SITSDataModule):
                 self.labels_roots["train"],
             )
             self.val_dataset = self.get_dataset(
-                self.features_root["eval"],
+                self.features_roots["eval"],
                 self.labels_roots["eval"],
             )
         else:

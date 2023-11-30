@@ -74,7 +74,7 @@ class Classifier(L.LightningModule):
         self.encoder = encoder
         self.decoder = decoder
 
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=['encoder', 'decoder'])
 
     def training_step(self, batch, batch_idx):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
@@ -179,7 +179,7 @@ class Classifier(L.LightningModule):
                     "ts": ts.cpu().numpy(),
                     "y": y.cpu().numpy(),
                     "mask": mask.cpu().numpy(),
-                    "attn_maps": attn_maps.numpy(),
+                    "attn_maps": attn_maps.cpu().numpy(),
                 }
             )
 
@@ -219,9 +219,9 @@ class Classifier(L.LightningModule):
             attn_maps, days, mask, y = [
                 batch[k] for k in ["attn_maps", "days", "mask", "y"]
             ]
-            _, class_occ_index = np.unique(y, return_index=True)
-            for i in class_occ_index:
-                class_name = self.classes[i]
+            class_ids, idxs = np.unique(y, return_index=True) 
+            for ci, i in zip(class_ids, idxs):
+                class_name = self.classes[ci]
                 attn_fig = plot_attention(
                     attn_maps[i],
                     days[i],
