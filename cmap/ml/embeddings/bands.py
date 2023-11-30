@@ -57,3 +57,5 @@ class PatchBandsEncoding(nn.Module):
         obs_embed = obs_embed.view(batch_size, seq_length, -1)
 
         return obs_embed
+
+

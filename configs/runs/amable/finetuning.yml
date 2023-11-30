@@ -1,21 +1,25 @@
 trainer:
-  callbacks: pytorch_lightning.callbacks.LearningRateMonitor
+  callbacks: 
+      class_path: pytorch_lightning.callbacks.LearningRateMonitor
   max_epochs: 200
+  precision: 16
+  gradient_clip_val : 0.5
+  accumulate_grad_batches: 1
+  detect_anomaly: true
 data:
   class_path: cmap.data.modules.LabelledDataModule
   init_args:
     data_root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_sorted
     num_workers: 20
-    batch_size: 128
+    batch_size: 256
     subsample: true
-    records_frac: 0.2
     classes:
       - other
       - ble_dur
       - ble_tendre
+      - mais
       - orge
       - colza
-      - mais
       - tournesol
 model:
   class_path: cmap.ml.classifiers.Classifier
@@ -39,4 +43,13 @@ model:
       init_args:
         hidden: 256 
         num_classes: 7
-
+    min_lr : 0.01
+    max_lr : 0.1
+    class_weights:
+      other: 0.03
+      ble_tendre: 0.03
+      ble_dur : 0.57
+      mais : 0.04
+      orge: 0.05
+      colza : 0.11
+      tournesol: 0.17

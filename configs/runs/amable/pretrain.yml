@@ -10,6 +10,8 @@ data:
     num_workers: 20
     batch_size: 512
     ablation: 0.15
+    sample: 0.5
+
 model:
   class_path: cmap.ml.autoencoders.AutoEncoder
   init_args:

@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import List, Dict
 
 import numpy as np
 from numpy.lib import append
@@ -33,18 +33,21 @@ class Classifier(L.LightningModule):
         self,
         encoder: nn.Module,
         decoder: nn.Module,
+        class_weights : Dict[str, float],
         classes: List[str] = DEFAULT_CLASSES,
         min_lr: float = 1e-6,
         max_lr: float = 1e-4,
         gamma: float = 0.99,
         warmup_epochs: int = 10,
         wd: float = 1e-4,
+        get_att : bool = True,
     ):
         super().__init__()
 
         # labels
         self.classes = classes
         self.n_classes = len(classes)
+        self.classes_weights = [class_weights[c] for c in classes]
 
         # Optimizationin
         self.min_lr = min_lr
@@ -54,7 +57,7 @@ class Classifier(L.LightningModule):
         self.wd = wd
 
         # Metrics
-        self.criterion = FocalLoss(gamma=1)
+        self.criterion = nn.CrossEntropyLoss(weight=torch.FloatTensor(self.classes_weights))
         self.train_f1 = MulticlassF1Score(num_classes=len(classes))
         self.val_f1 = MulticlassF1Score(num_classes=len(classes))
         self.train_conf_mat = MulticlassConfusionMatrix(
@@ -69,6 +72,7 @@ class Classifier(L.LightningModule):
         # data
         self.val_emb = []
         self.val_batches = []
+        self.get_att = get_att
 
         # Layers
         self.encoder = encoder
@@ -171,7 +175,7 @@ class Classifier(L.LightningModule):
             )
 
         # Save data for attention maps
-        if batch_idx == 0:
+        if batch_idx == 0 and self.get_att:
             attn_maps = self._get_attention_maps(ts, days, mask)
             self.val_batches.append(
                 {

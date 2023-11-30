@@ -49,7 +49,7 @@ class AutoEncoder(L.LightningModule):
             batch[k] for k in ["ts", "days", "target", "mask", "loss_mask", "season"]
         ]
 
-        ts_encoded = self.encoder(ts, days, ~mask)
+        ts_encoded = self.encoder(ts, days, mask)
         ts_hat = self.decoder(ts_encoded)
 
         loss = self.criterion(ts_hat, target)
@@ -75,7 +75,7 @@ class AutoEncoder(L.LightningModule):
             batch[k] for k in ["ts", "days", "target", "mask", "loss_mask", "season"]
         ]
 
-        ts_encoded = self.encoder(ts, days, ~mask)
+        ts_encoded = self.encoder(ts, days, mask)
         ts_hat = self.decoder(ts_encoded)
 
         loss = self.criterion(ts_hat, target)

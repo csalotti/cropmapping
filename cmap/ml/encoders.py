@@ -70,18 +70,19 @@ class SITSFormer(nn.Module):
     def forward(self, ts: Tensor, days: Tensor, mask: Tensor):
         mask = mask == 0
 
-        logger.debug(f"ts : {ts}\ndays : {days}\nmask : {mask}")
         x_position_emb = self.position_encoder(days)
         x_bands_emb = self.bands_encoder(ts)
-        logger.debug(f"position : {x_position_emb}\nbands : {x_bands_emb}")
 
         x_emb = self.dropout(x_position_emb + x_bands_emb)
-        logger.debug(f"post dropout : {x_emb}")
 
         # Transpose N and T for convenience in masking
         x_emb = x_emb.transpose(0, 1)
         x_trans = self.transformer_encoder(x_emb, src_key_padding_mask=mask)
         x_trans = x_trans.transpose(0, 1)
-        logger.debug(f"Transformer: {x_trans}")
+        
+        if torch.isnan(x_trans).any() :
+            nan_indices = torch.nonzero(torch.isnan(x_trans),as_tuple=False)
+            bi = nan_indices.cpu().numpy()[0][0]
+            ValueError(x_emb.transpose(0,1)[bi,:,:])
 
         return x_trans

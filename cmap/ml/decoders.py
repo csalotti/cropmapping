@@ -13,6 +13,9 @@ class MulticlassClassification(nn.Module):
 
     def forward(self, x, mask):
         mask = (1 - mask.unsqueeze(-1)) * 1e6
+
         x = x - mask  # mask invalid timesteps
         x, _ = torch.max(x, dim=1)  # max-pooling
-        return self.linear(x)
+        x = self.linear(x)
+
+        return x
