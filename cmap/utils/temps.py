@@ -21,11 +21,14 @@ def get_chunk_temps(in_root, chunk_id):
 
 def get_temps(in_path, out_path):
     for stage in ['train', 'eval']:
-        chunks = [re.findall(basename(f), r'\d++') for f in glob(join(in_path, stage, "features", "*.csv"))]
+        chunks = [re.findall(r'\d+', basename(f))[0] for f in glob(join(in_path, stage, "features", "*.csv"))]
+        print(f"{stage} chunks {chunks}")
         for chunk_id in chunks:
+            print(f"Get chunk {chunk_id}")
             chunk_temp_df = get_chunk_temps(in_path, chunk_id)
             poi_uniques =chunk_temp_df.poi_id.unique()
-            for poi in poi_uniques
+            print(f"Writing chunk {chunk_id}")
+            for poi in poi_uniques:
                 poi_df = chunk_temp_df[chunk_temp_df.poi_id == poi]
                 chunk_id = poi_df.iloc[0]['chunk_id']
                 poi_df.sort_values(['date']).to_csv(join(out_path, stage, "features", "temperatures", f"{poi}.csv"))
