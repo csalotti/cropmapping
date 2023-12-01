@@ -25,7 +25,7 @@ from cmap.utils.constants import (
 logger = logging.getLogger("cmap.data.ChunkDataset")
 # logger.addHandler(logging.FileHandler("dataset.log"))
 REFERENCE_YEAR = 2023
-MIN_DAYS = 3
+MIN_DAYS = 30
 SEASONS = [2018, 2019, 2020, 2021]
 
 
