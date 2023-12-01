@@ -1,7 +1,7 @@
 trainer:
   callbacks: 
       class_path: pytorch_lightning.callbacks.LearningRateMonitor
-  max_epochs: 30
+  max_epochs: 100
   precision: 32
   gradient_clip_val : 0.5
   detect_anomaly: true
@@ -43,9 +43,8 @@ model:
       init_args:
         hidden: 256 
         num_classes: 7
-    encoder_weights_path: archives/2023_12_01_pretrain_50/weights/encoder.safetensors
-    min_lr : 0.001
-    max_lr : 0.001
+    min_lr : 0.00001
+    max_lr : 0.0001
     class_weights:
       other: 0.03
       ble_tendre: 0.03
