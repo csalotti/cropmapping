@@ -31,7 +31,7 @@ class PatchBandsEncoding(nn.Module):
         )
 
         self.linear = nn.Linear(
-            in_features=channel_size[1], out_features=channel_size[2]
+            in_features=2 * channel_size[1], out_features=channel_size[2]
         )
 
         self.embed_size = channel_size[-1]
@@ -57,5 +57,3 @@ class PatchBandsEncoding(nn.Module):
         obs_embed = obs_embed.view(batch_size, seq_length, -1)
 
         return obs_embed
-
-
