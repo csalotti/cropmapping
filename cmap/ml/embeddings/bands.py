@@ -50,7 +50,7 @@ class PatchBandsEncoding(nn.Module):
         )
 
         self.linear = nn.Linear(
-            in_features=2 * channel_size[1], out_features=channel_size[2]
+            in_features=channel_size[1], out_features=channel_size[2]
         )
 
         self.embed_size = channel_size[-1]
