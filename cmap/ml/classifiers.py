@@ -117,7 +117,7 @@ class Classifier(L.LightningModule):
         # Data
         # Save Labels
         if self.current_epoch == 0:
-            self.train_labels.extend(y.cpu().tolist())
+            self.train_labels.extend([self.classes[i] for i in y.cpu().tolist()])
 
         return loss
 
