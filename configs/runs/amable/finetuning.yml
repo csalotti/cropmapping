@@ -1,10 +1,9 @@
 trainer:
   callbacks: 
       class_path: pytorch_lightning.callbacks.LearningRateMonitor
-  max_epochs: 200
-  precision: 16
+  max_epochs: 30
+  precision: 32
   gradient_clip_val : 0.5
-  accumulate_grad_batches: 1
   detect_anomaly: true
 data:
   class_path: cmap.data.modules.LabelledDataModule
@@ -13,6 +12,7 @@ data:
     num_workers: 20
     batch_size: 256
     subsample: true
+    records_frac: 0.2
     classes:
       - other
       - ble_dur
@@ -43,9 +43,9 @@ model:
       init_args:
         hidden: 256 
         num_classes: 7
-    encoder_weights_path: archives/2023_12_01_pretrain_50/weights/encoder.safetensor
-    min_lr : 0.01
-    max_lr : 0.1
+    encoder_weights_path: archives/2023_12_01_pretrain_50/weights/encoder.safetensors
+    min_lr : 0.001
+    max_lr : 0.001
     class_weights:
       other: 0.03
       ble_tendre: 0.03

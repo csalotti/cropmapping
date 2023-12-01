@@ -145,11 +145,11 @@ class Classifier(L.LightningModule):
         )
 
         # Label distribution
-        if self.current_epoch == 0:
+        if (self.current_epoch == 0) and (len(self.train_labels) > 0):
             labels_dist_fig = get_dist_plot(self.train_labels)
             self.logger.experiment.add_figure(
                 "Labels Distribution/Training",
-                labels_dist_fig
+                labels_dist_fig,
                 global_step=self.current_epoch,
             )
 
@@ -264,11 +264,11 @@ class Classifier(L.LightningModule):
                 )
 
         # Label distribution
-        if self.current_epoch == 0:
+        if (self.current_epoch == 0) and (len(self.val_labels) > 0):
             labels_dist_fig = get_dist_plot(self.val_labels)
             self.logger.experiment.add_figure(
                 "Labels Distribution/Validation",
-                labels_dist_fig
+                labels_dist_fig,
                 global_step=self.current_epoch,
             )
 

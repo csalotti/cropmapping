@@ -80,9 +80,9 @@ class SITSFormer(nn.Module):
         x_trans = self.transformer_encoder(x_emb, src_key_padding_mask=mask)
         x_trans = x_trans.transpose(0, 1)
         
-        if torch.isnan(x_trans).any() :
-            nan_indices = torch.nonzero(torch.isnan(x_trans),as_tuple=False)
-            bi = nan_indices.cpu().numpy()[0][0]
-            ValueError(x_emb.transpose(0,1)[bi,:,:])
+        #if torch.isnan(x_trans).any() :
+        #    nan_indices = torch.nonzero(torch.isnan(x_trans),as_tuple=False)
+        #    bi = nan_indices.cpu().numpy()[0][0]
+        #    ValueError(x_emb.transpose(0,1)[bi,:,:])
 
         return x_trans
