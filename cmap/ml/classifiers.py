@@ -92,8 +92,8 @@ class Classifier(L.LightningModule):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
 
         # Infer
-        ts_encoded = self.encoder(ts, days, mask)
-        y_hat = self.decoder(ts_encoded, mask)
+        ts_encoded = self.encoder(ts=ts, days=days, mask=mask)
+        y_hat = self.decoder(ts=ts_encoded, mask=mask)
 
         # Reshape
         y = y.squeeze()
@@ -167,8 +167,8 @@ class Classifier(L.LightningModule):
         ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
 
         # Infer
-        ts_encoded = self.encoder(ts, days, mask)
-        y_hat = self.decoder(ts_encoded, mask)
+        ts_encoded = self.encoder(ts=ts, days=days, mask=mask)
+        y_hat = self.decoder(ts=ts_encoded, maks=mask)
 
         # Reshape
         y = y.squeeze()
@@ -271,7 +271,6 @@ class Classifier(L.LightningModule):
                 labels_dist_fig,
                 global_step=self.current_epoch,
             )
-
 
         self.val_labels.clear()
         self.val_conf_mat.reset()

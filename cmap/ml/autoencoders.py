@@ -8,6 +8,7 @@ from torch.optim.lr_scheduler import ExponentialLR, LinearLR, SequentialLR
 from cmap.utils.ndvi import plot_ndvi
 from cmap.utils.attention import plot_attention, patch_attention
 
+
 class AutoEncoder(L.LightningModule):
     def __init__(
         self,
@@ -41,8 +42,8 @@ class AutoEncoder(L.LightningModule):
         self.ndvi_sample = ndvi_sample
         self.val_data = []
         self.plot_indexes = []
-        
-        self.save_hyperparameters(ignore=['encoder', 'decoder', 'criterion'])
+
+        self.save_hyperparameters(ignore=["encoder", "decoder", "criterion"])
 
     def training_step(self, batch, batch_idx):
         ts, days, target, mask, loss_mask, _ = [
@@ -60,7 +61,7 @@ class AutoEncoder(L.LightningModule):
                 "Losses/train": loss,
             },
             on_step=False,
-            on_epoch=True
+            on_epoch=True,
         )
         return loss
 
@@ -86,7 +87,7 @@ class AutoEncoder(L.LightningModule):
                 "Losses/val": loss,
             },
             on_step=False,
-            on_epoch=True
+            on_epoch=True,
         )
 
         if len(self.val_data) == 0:
@@ -104,7 +105,7 @@ class AutoEncoder(L.LightningModule):
                     "ts_hat": ts_hat.cpu().numpy()[self.plot_indexes, :, :],
                     "days": days.cpu().numpy()[self.plot_indexes, :],
                     "mask": mask.cpu().numpy()[self.plot_indexes, :],
-                    "attn_maps" : attn_maps.cpu().numpy()[self.plot_indexes, :],
+                    "attn_maps": attn_maps.cpu().numpy()[self.plot_indexes, :],
                     "loss_mask": loss_mask.cpu().numpy()[self.plot_indexes, :],
                     "season": seasons.cpu().numpy()[self.plot_indexes, :],
                 }
@@ -127,17 +128,17 @@ class AutoEncoder(L.LightningModule):
                 )
 
                 att_fig = plot_attention(
-                        attention_map=batch['attn_maps'][i],
-                        days=batch['days'][i],
-                        mask=batch['mask'][i],
-                        )
+                    attention_map=batch["attn_maps"][i],
+                    days=batch["days"][i],
+                    mask=batch["mask"][i],
+                )
 
                 self.logger.experiment.add_figure(
                     f"NDVI/sample_{i}",
                     ndvi_fig,
                     self.current_epoch,
                 )
-                
+
                 self.logger.experiment.add_figure(
                     f"Attention Maps/sample_{i}",
                     att_fig,
