@@ -93,7 +93,7 @@ class Classifier(L.LightningModule):
 
         # Infer
         ts_encoded = self.encoder(ts=ts, days=days, mask=mask)
-        y_hat = self.decoder(ts=ts_encoded, mask=mask)
+        y_hat = self.decoder(x=ts_encoded, mask=mask)
 
         # Reshape
         y = y.squeeze()
@@ -168,7 +168,7 @@ class Classifier(L.LightningModule):
 
         # Infer
         ts_encoded = self.encoder(ts=ts, days=days, mask=mask)
-        y_hat = self.decoder(ts=ts_encoded, maks=mask)
+        y_hat = self.decoder(x=ts_encoded, mask=mask)
 
         # Reshape
         y = y.squeeze()
