@@ -59,15 +59,12 @@ class PatchBandsEncoding(nn.Module):
         batch_size = input_sequence.size(0)
         seq_length = input_sequence.size(1)
         band_num = input_sequence.size(2)
-
+        patch_size = input_sequence.size(3)
         first_dim = batch_size * seq_length
 
         obs_embed = input_sequence.view(
-            first_dim,
-            band_num,
-        ).unsqueeze(
-            1
-        )  # [N * T, 1, B]
+            first_dim, band_num, patch_size, patch_size
+        ).unsqueeze(1)
         obs_embed = self.conv1(obs_embed)
         obs_embed = self.conv2(obs_embed)
         obs_embed = self.linear(
