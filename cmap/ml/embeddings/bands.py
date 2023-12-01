@@ -10,28 +10,47 @@ class PatchBandsEncoding(nn.Module):
     def __init__(self, channel_size=(32, 64, 256), kernel_sizes=(5, 5)):
         super().__init__()
 
+        # self.conv1 = nn.Sequential(
+        #     nn.Conv1d(
+        #         in_channels=1,
+        #         out_channels=channel_size[0],
+        #         kernel_size=kernel_sizes[0],
+        #     ),
+        #     nn.ReLU(),
+        #     nn.BatchNorm1d(channel_size[0]),
+        # )
+        #
+        # self.conv2 = nn.Sequential(
+        #     nn.Conv1d(
+        #         in_channels=channel_size[0],
+        #         out_channels=channel_size[1],
+        #         kernel_size=kernel_sizes[1],
+        #     ),
+        #     nn.ReLU(),
+        #     nn.BatchNorm1d(channel_size[1]),
+        # )
         self.conv1 = nn.Sequential(
-            nn.Conv1d(
+            nn.Conv3d(
                 in_channels=1,
                 out_channels=channel_size[0],
-                kernel_size=kernel_sizes[0],
+                kernel_size=(kernel_sizes[0], 1, 1),
             ),
             nn.ReLU(),
-            nn.BatchNorm1d(channel_size[0]),
+            nn.BatchNorm3d(channel_size[0]),
         )
 
         self.conv2 = nn.Sequential(
-            nn.Conv1d(
+            nn.Conv3d(
                 in_channels=channel_size[0],
                 out_channels=channel_size[1],
-                kernel_size=kernel_sizes[1],
+                kernel_size=(kernel_sizes[1], 1, 1),
             ),
             nn.ReLU(),
-            nn.BatchNorm1d(channel_size[1]),
+            nn.BatchNorm3d(channel_size[1]),
         )
 
         self.linear = nn.Linear(
-            in_features=channel_size[1], out_features=channel_size[2]
+            in_features=2 * channel_size[1], out_features=channel_size[2]
         )
 
         self.embed_size = channel_size[-1]
@@ -57,5 +76,3 @@ class PatchBandsEncoding(nn.Module):
         obs_embed = obs_embed.view(batch_size, seq_length, -1)
 
         return obs_embed
-
-
