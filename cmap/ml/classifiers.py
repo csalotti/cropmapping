@@ -256,7 +256,7 @@ class Classifier(L.LightningModule):
                         :,
                         : sample_mask.sum(),
                         : sample_mask.sum(),
-                    ],
+                    ].mean(axis=1)
                     days=days[i][: sample_mask.sum()],
                     post_title=class_name,
                 )

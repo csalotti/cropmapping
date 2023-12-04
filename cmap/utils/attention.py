@@ -57,7 +57,7 @@ def plot_attention(attention_map, days, post_title: str = "", max_days=398):
     max_value = df["map_value"].max()
     g.set(
         title=f"Average Attention map {post_title}",
-        ylim=(0, max(1.0, max_value * 2)),
+        ylim=(0, min(1.0, max_value * 2)),
         xlim=(0, max_days),
     )
     plt.legend(loc="upper left", bbox_to_anchor=(1, 1), title="Layers")
