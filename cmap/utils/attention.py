@@ -1,3 +1,4 @@
+from datetime import date
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -26,25 +27,54 @@ class SaveAttentionMapHook:
         self.outputs = []
 
 
-def plot_attention(attention_map, days, post_title: str = "", max_days=398):
-    data = dict(enumerate(attention_map))
-    data["days"] = days
+def resample(attention_map, days, masks, classes, ref_month=11, ref_year=2023):
+    attn_maps_month = []
+    for attn_maps, d, m, c in zip(attention_map, days, masks, classes):
+        attn_maps = attn_maps[:, : m.sum(), : m.sum()]
+        d = d[: m.sum()]
+        data = dict(enumerate(attn_maps))
+        data["days"] = d
+        df = pd.DataFrame(data).melt(
+            id_vars="days",
+            var_name="layer",
+            value_name="map_value",
+        )
 
-    df = pd.DataFrame(data).melt(
-        id_vars="days",
-        var_name="layer",
-        value_name="map_value",
+        df["date"] = pd.to_datetime(
+            date(year=ref_year - 1, month=ref_month, day=1) + df["days"]
+        )
+        df["month"] = df["date"].dt.month
+        df["year"] = df["date"].dt.year
+        df.query("(year == {ref_year}) & (month >= ref_month)")["month"] = (
+            df.query("(year == {ref_year}) & (month >= ref_month)")["month"] + 1
+        )
+        df_month = (
+            df[["month", "layer", "map_value"]]
+            .groupby(["month", "layer"], as_index=False)
+            .sum()
+        )
+
+        df_month["class"] = c
+
+        attn_maps_month.append(df_month)
+
+    return (
+        pd.concat(attn_maps_month)
+        .groupby(["month", "layer", "class"], as_index=False)
+        .mean()
     )
 
+
+def plot_attention(attn_maps_df, step_name: str, post_title: str = ""):
     fig, ax = plt.subplots()
 
-    for layer in df["layer"].unique():
+    for layer in attn_maps_df["layer"].unique():
         # Filter DataFrame for the current layer
-        layer_df = df[df["layer"] == layer]
+        layer_df = attn_maps_df[attn_maps_df["layer"] == layer]
 
         # Plot line
         g = sns.lineplot(
-            x="days",
+            x=step_name,
             y="map_value",
             data=layer_df,
             label=layer,
@@ -52,13 +82,10 @@ def plot_attention(attention_map, days, post_title: str = "", max_days=398):
         )
 
         # Fill the area under the line
-        plt.fill_between(layer_df["days"], 0, layer_df["map_value"], alpha=0.2)
+        plt.fill_between(layer_df[step_name], 0, layer_df["map_value"], alpha=0.2)
 
-    max_value = df["map_value"].max()
     g.set(
         title=f"Average Attention map {post_title}",
-        ylim=(0, min(1.0, max_value * 2)),
-        xlim=(0, max_days),
     )
     plt.legend(loc="upper left", bbox_to_anchor=(1, 1), title="Layers")
     plt.tight_layout()

@@ -199,17 +199,15 @@ class Classifier(L.LightningModule):
             )
 
         # Save data for attention maps
-        if batch_idx == 0:
-            attn_maps = self._get_attention_maps(ts, days, mask)
-            self.val_batches.append(
-                {
-                    "days": days.cpu().numpy(),
-                    "ts": ts.cpu().numpy(),
-                    "y": y.cpu().numpy(),
-                    "mask": mask.cpu().numpy(),
-                    "attn_maps": attn_maps.cpu().numpy(),
-                }
-            )
+        attn_maps = self._get_attention_maps(ts, days, mask).mean(dim=-1)
+        self.val_batches.append(
+            {
+                "days": days.cpu().numpy(),
+                "y": y.cpu().numpy(),
+                "mask": mask.cpu().numpy(),
+                "attn_maps": attn_maps.cpu().numpy(),
+            }
+        )
 
     def on_validation_epoch_end(self):
         fig_ = sns.heatmap(
@@ -256,7 +254,7 @@ class Classifier(L.LightningModule):
                         :,
                         : sample_mask.sum(),
                         : sample_mask.sum(),
-                    ].mean(axis=1)
+                    ],
                     days=days[i][: sample_mask.sum()],
                     post_title=class_name,
                 )

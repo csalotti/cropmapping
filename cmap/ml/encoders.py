@@ -63,7 +63,9 @@ class SITSFormer(nn.Module):
 
         outputs = outpout_hook.outputs
         # Merge layers on dim 1
-        outputs = torch.concatenate([o.unsqueeze(1) for o in outputs], dim=1)
+        outputs = torch.concatenate(
+            [o.unsqueeze(1) for o in outputs], dim=1
+        )  # [N, L, S, S]
 
         return outputs
 
