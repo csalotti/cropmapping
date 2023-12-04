@@ -3,7 +3,7 @@ import logging
 from glob import glob
 from os.path import join, basename
 import shutil
-from typing import List
+from typing import List, Optional
 from functools import partial
 
 import pandas as pd
@@ -116,6 +116,7 @@ class LabelledDataModule(SITSDataModule):
         data_root: str,
         classes: List[str],
         classes_config: str = "configs/rpg_codes.yml",
+        use_temp : bool = False,
         batch_size: int = 32,
         prepare: bool = False,
         num_workers: int = 3,
@@ -138,6 +139,7 @@ class LabelledDataModule(SITSDataModule):
         }
         self.classes = classes
         self.classes_config = classes_config
+        self.use_temp = use_temp
         self.subsample = subsample
         self.records_frac = records_frac
 
@@ -185,12 +187,13 @@ class LabelledDataModule(SITSDataModule):
                 ).apply(lambda x: x.sample(frac=self.records_frac))
 
         indexes = indexes[indexes[POINT_ID_COL].isin(labels[POINT_ID_COL])]
+        temperatures = join(features_root, "temperatures") if self.use_temp else None
 
         return ChunkLabeledDataset(
             features_root=features_root,
             labels=labels,
             indexes=indexes,
-            temperatures_root=join(features_root, "tempratures"),
+            temperatures_root=temperatures,
             classes=self.classes,
             label_to_class=self.label_to_class,
             augment=augment,

@@ -81,7 +81,7 @@ class ChunkDataset(IterableDataset):
         # Days normalizatioin to ref date
         days_norm = (
             days - datetime(year=season - 1, month=self.start_month, day=1)
-        ).dt.days
+        ).dt.days.values
 
         # Temperatures
         if self.temperatures_root:
@@ -94,7 +94,7 @@ class ChunkDataset(IterableDataset):
         n_positions = len(positions)
         ts_padded = np.pad(
             ts,
-            np.array([(0, self.max_n_positions - n_days), (0, 0)]),
+            np.array([(0, self.max_n_positions - n_positions), (0, 0)]),
             constant_values=0,
         )
         positions_padded = np.pad(
@@ -164,7 +164,7 @@ class ChunkDataset(IterableDataset):
 
                 if self.temperatures_root:
                     temps_df = pd.read_csv(
-                        join(self.temperatures_root, str(chunk_id), f"{poi_id}.csv"),
+                        join(self.temperatures_root, f"{poi_id}.csv"),
                         parse_dates=["date"],
                     )
 

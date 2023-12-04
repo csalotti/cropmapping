@@ -7,34 +7,33 @@ logger = logging.getLogger("lightning.pytorch.ml.embeddings.bands")
 
 
 class PatchBandsEncoding(nn.Module):
-    def __init__(self, channel_size=(32, 64, 256), kernel_sizes=(5, 5)):
+    def __init__(self, channels=(32, 64, 256), kernels=(5, 5)):
         super().__init__()
 
         self.conv1 = nn.Sequential(
             nn.Conv1d(
                 in_channels=1,
-                out_channels=channel_size[0],
-                kernel_size=kernel_sizes[0],
+                out_channels=channels[0],
+                kernel_size=kernels[0],
             ),
             nn.ReLU(),
-            nn.BatchNorm1d(channel_size[0]),
+            nn.BatchNorm1d(channels[0]),
         )
 
         self.conv2 = nn.Sequential(
             nn.Conv1d(
-                in_channels=channel_size[0],
-                out_channels=channel_size[1],
-                kernel_size=kernel_sizes[1],
+                in_channels=channels[0],
+                out_channels=channels[1],
+                kernel_size=kernels[1],
             ),
             nn.ReLU(),
-            nn.BatchNorm1d(channel_size[1]),
+            nn.BatchNorm1d(channels[1]),
         )
 
         self.linear = nn.Linear(
-            in_features=channel_size[1], out_features=channel_size[2]
+            in_features=channels[1], out_features=channels[2]
         )
 
-        self.embed_size = channel_size[-1]
 
     def forward(self, input_sequence):
         batch_size = input_sequence.size(0)
