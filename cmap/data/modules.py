@@ -115,8 +115,10 @@ class LabelledDataModule(SITSDataModule):
         self,
         data_root: str,
         classes: List[str],
+        train_seasons: List[int] = [2017, 2018, 2019, 2020],
+        val_seasons: List[int] = [2021],
         classes_config: str = "configs/rpg_codes.yml",
-        use_temp : bool = False,
+        use_temp: bool = False,
         batch_size: int = 32,
         prepare: bool = False,
         num_workers: int = 3,
@@ -125,17 +127,21 @@ class LabelledDataModule(SITSDataModule):
         raw_data_root: str = os.environ.get("RAW_DATA_ROOT", ""),
     ):
         super().__init__(
-            join(data_root, "train", "features"),
-            join(data_root, "eval", "features"),
-            batch_size,
-            prepare,
-            num_workers,
-            raw_data_root,
+            train_features_root=join(data_root, "train", "features"),
+            val_features_root=join(data_root, "eval", "features"),
+            batch_size=batch_size,
+            prepare=prepare,
+            num_workers=num_workers,
+            raw_data_root=raw_data_root,
         )
 
         self.labels_roots = {
             "train": join(data_root, "train", "labels"),
             "eval": join(data_root, "eval", "labels"),
+        }
+        self.seasons = {
+            "train": train_seasons,
+            "eval": val_seasons,
         }
         self.classes = classes
         self.classes_config = classes_config
@@ -156,7 +162,9 @@ class LabelledDataModule(SITSDataModule):
                     new_path = join(self.labels_roots[stage], basename(f))
                     shutil.copy(f, new_path)
 
-    def get_dataset(self, features_root, labels_root: str, augment: bool = False):
+    def get_dataset(
+        self, features_root, labels_root: str, seasons: List[int], augment: bool = False
+    ):
         indexes = pd.read_json(join(features_root, "indexes.json"))
 
         # Label loading and code mapping
@@ -192,6 +200,7 @@ class LabelledDataModule(SITSDataModule):
         return ChunkLabeledDataset(
             features_root=features_root,
             labels=labels,
+            seasons=seasons,
             indexes=indexes,
             temperatures_root=temperatures,
             classes=self.classes,
@@ -204,11 +213,13 @@ class LabelledDataModule(SITSDataModule):
             self.train_dataset = self.get_dataset(
                 self.features_roots["train"],
                 self.labels_roots["train"],
+                self.seasons["train"],
                 augment=True,
             )
             self.val_dataset = self.get_dataset(
                 self.features_roots["eval"],
                 self.labels_roots["eval"],
+                self.seasons["eval"],
             )
         else:
             raise NotImplementedError("No implementation for stage {stage}")
@@ -226,12 +237,12 @@ class MaskedDataModule(SITSDataModule):
         raw_data_root: str = os.environ.get("RAW_DATA_ROOT", ""),
     ):
         super().__init__(
-            join(data_root, "train", "features"),
-            join(data_root, "eval", "features"),
-            batch_size,
-            prepare,
-            num_workers,
-            raw_data_root,
+            train_features_root=join(data_root, "train", "features"),
+            val_features_root=join(data_root, "eval", "features"),
+            batch_size=batch_size,
+            prepare=prepare,
+            num_workers=num_workers,
+            raw_data_root=raw_data_root,
         )
 
         self.ablation = ablation
