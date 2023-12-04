@@ -5,7 +5,7 @@ import torch.nn as nn
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, max_len=397):
+    def __init__(self, d_model: int, tau: float = 10000.0, max_len: int = 397):
         super().__init__()
 
         # Compute the positional encodings once in log space.
@@ -13,7 +13,7 @@ class PositionalEncoding(nn.Module):
 
         position = torch.arange(0, max_len).float().unsqueeze(1)  # [max_len, 1]
         div_term = (
-            torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model)
+            torch.arange(0, d_model, 2).float() * -(math.log(tau) / d_model)
         ).exp()  # [d_model/2,]
 
         # keep pe[0,:] to zeros

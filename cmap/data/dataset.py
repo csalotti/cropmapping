@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from os.path import join
 from pprint import pformat
-from random import random, sample
+from random import sample
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -17,6 +17,7 @@ from cmap.utils.constants import (
     DATE_COL,
     LABEL_COL,
     POINT_ID_COL,
+    TEMP_COL,
     SEASON_COL,
     SIZE_COL,
     START_COL,
@@ -34,19 +35,19 @@ class ChunkDataset(IterableDataset):
         self,
         features_root: str,
         indexes: pd.DataFrame,
-        temperatures_root : Optional[str] = None,
+        temperatures_root: Optional[str] = None,
         start_month: int = 11,
         end_month: int = 12,
         n_steps: int = 3,
         standardize: bool = False,
-        augment : bool = False,
+        augment: bool = False,
     ):
         self.features_root = features_root
         self.indexes = indexes.sort_values([CHUNK_ID_COL, START_COL])
         self.temperatures_root = temperatures_root
         self.start_month = start_month
         self.end_month = end_month
-        self.max_n_days = (
+        self.max_n_positions = (
             (
                 datetime(year=REFERENCE_YEAR, month=end_month, day=1)
                 - datetime(year=REFERENCE_YEAR - 1, month=start_month, day=1)
@@ -56,7 +57,7 @@ class ChunkDataset(IterableDataset):
         self.standardize = standardize
         self.augment = augment
 
-        logger.debug(f"Time Series sampled on {self.max_n_days} days")
+        logger.debug(f"Time Series sampled on {self.max_n_positions} days")
 
     def transforms(self, season_features_df: pd.DataFrame, season: int):
         days = season_features_df[DATE_COL].copy()  # T
@@ -69,34 +70,42 @@ class ChunkDataset(IterableDataset):
         else:
             ts /= 10_000
 
-
         # data augmentation
         if self.augment:
             sigma = 1e-2
-            clip =  3e-2
-            ts  = (ts + np.clip(np.random.normal(0, sigma, size=ts.shape), -1 * clip, clip)).astype(np.float32)
-        
+            clip = 3e-2
+            ts = (
+                ts + np.clip(np.random.normal(0, sigma, size=ts.shape), -1 * clip, clip)
+            ).astype(np.float32)
+
         # Days normalizatioin to ref date
         days_norm = (
             days - datetime(year=season - 1, month=self.start_month, day=1)
         ).dt.days
 
+        # Temperatures
+        if self.temperatures_root:
+            temperatures = np.cumsum(season_features_df[TEMP_COL].values, dtype=float)
+            positions = temperatures
+        else:
+            positions = days_norm.copy()
+
         # Constant padding to fit fixed size
-        n_days = len(days_norm)
+        n_positions = len(positions)
         ts_padded = np.pad(
             ts,
-            np.array([(0, self.max_n_days - n_days), (0, 0)]),
+            np.array([(0, self.max_n_positions - n_days), (0, 0)]),
             constant_values=0,
         )
-        days_padded = np.pad(
-            days_norm,
-            (0, self.max_n_days - n_days),
+        positions_padded = np.pad(
+            positions,
+            (0, self.max_n_positions - n_positions),
             constant_values=0,
         )
-        days_pad = self.max_n_days - n_days
-        mask = np.array([1] * n_days + [0] * days_pad)
+        mask = np.zeros(self.max_n_positions)
+        mask[:n_positions] = 1
 
-        return ts_padded, days_padded, mask
+        return ts_padded, positions_padded, days_norm, mask
 
     def _read_chunk(self, chunk_id: int) -> TextFileReader:
         date_col_idx = (
@@ -138,6 +147,7 @@ class ChunkDataset(IterableDataset):
                 logger.debug(f"Last row id {cur_row}")
 
                 # Get single point time series data
+                poi_id = record_idx[POINT_ID_COL]
                 record_start_row = record_idx[START_COL]
                 chunk_size = record_idx[SIZE_COL]
                 if record_start_row != cur_row:
@@ -146,19 +156,25 @@ class ChunkDataset(IterableDataset):
                 records_features_df = chunk_reader.get_chunk(chunk_size + 1)
                 cur_row = record_start_row + chunk_size + 1
 
-                # Invalid record
-                if record_idx[SIZE_COL] <= MIN_DAYS:
-                    continue
-
                 if len(records_features_df[POINT_ID_COL].unique()) > 1:
                     raise ValueError(
                         f"Chunk size {record_idx[SIZE_COL]} sampled two points"
                         + f"{records_features_df[POINT_ID_COL].unique()}\n{records_features_df}"
                     )
 
-               
+                if self.temperatures_root:
+                    temps_df = pd.read_csv(
+                        join(self.temperatures_root, str(chunk_id), f"{poi_id}.csv"),
+                        parse_dates=["date"],
+                    )
 
+                    records_features_df = records_features_df.merge(
+                        temps_df[[DATE_COL, TEMP_COL]], on=[DATE_COL], how="inner"
+                    )
 
+                # Invalid record
+                if record_idx[SIZE_COL] <= MIN_DAYS:
+                    continue
 
                 yield records_features_df
 
@@ -171,18 +187,22 @@ class ChunkLabeledDataset(ChunkDataset):
         indexes: pd.DataFrame,
         classes: List[str],
         label_to_class: Dict[str, int],
+        temperatures_root: Optional[str] = None,
         start_month: int = 11,
         end_month: int = 12,
         n_steps: int = 3,
         standardize: bool = False,
+        augment: bool = False,
     ):
         super().__init__(
             features_root,
             indexes,
+            temperatures_root,
             start_month,
             end_month,
             n_steps,
             standardize,
+            augment,
         )
         self.labels_df = labels
         self.classes = {cn: i for i, cn in enumerate(classes)}
@@ -208,7 +228,7 @@ class ChunkLabeledDataset(ChunkDataset):
 
                 class_id = np.array([self.classes[label]])
 
-                ts, days, mask = self.transforms(season_features_df, season)
+                ts, positions, days, mask = self.transforms(season_features_df, season)
 
                 logger.debug(
                     f"Shapes :\n\tdays\t: {days.shape}"
@@ -218,6 +238,7 @@ class ChunkLabeledDataset(ChunkDataset):
                 )
 
                 output = {
+                    "positions": positions,
                     "days": days,
                     "mask": mask,
                     "ts": ts,
@@ -259,7 +280,7 @@ class ChunkMaskedDataset(ChunkDataset):
 
     def random_masking(self, ts, ts_length):
         ts_masked = ts.copy()
-        days_masked = np.array([0] * self.max_n_days)
+        days_masked = np.array([0] * self.max_n_positions)
         n_removed_days = int(self.ablation * ts_length)
 
         # if random() < 0.5:

@@ -10,6 +10,8 @@ SIZE_COL = "size"
 CHUNK_ID_COL = "chunk_id"
 SEASON_COL = "season"
 
+# Addditionnal features
+TEMP_COL = "temperature"
 
 # Bands
 BAND_2_COL = "R20m_B02"

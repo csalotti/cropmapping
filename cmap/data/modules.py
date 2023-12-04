@@ -154,7 +154,7 @@ class LabelledDataModule(SITSDataModule):
                     new_path = join(self.labels_roots[stage], basename(f))
                     shutil.copy(f, new_path)
 
-    def get_dataset(self, features_root, labels_root: str):
+    def get_dataset(self, features_root, labels_root: str, augment: bool = False):
         indexes = pd.read_json(join(features_root, "indexes.json"))
 
         # Label loading and code mapping
@@ -190,8 +190,10 @@ class LabelledDataModule(SITSDataModule):
             features_root=features_root,
             labels=labels,
             indexes=indexes,
+            temperatures_root=join(features_root, "tempratures"),
             classes=self.classes,
             label_to_class=self.label_to_class,
+            augment=augment,
         )
 
     def setup(self, stage: str):
@@ -199,6 +201,7 @@ class LabelledDataModule(SITSDataModule):
             self.train_dataset = self.get_dataset(
                 self.features_roots["train"],
                 self.labels_roots["train"],
+                augment=True,
             )
             self.val_dataset = self.get_dataset(
                 self.features_roots["eval"],

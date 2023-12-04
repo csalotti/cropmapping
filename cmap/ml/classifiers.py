@@ -89,10 +89,12 @@ class Classifier(L.LightningModule):
         self.save_hyperparameters(ignore=["encoder", "decoder"])
 
     def training_step(self, batch, batch_idx):
-        ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
+        ts, positions, mask, y = [
+            batch[k] for k in ["ts", "positions", "mask", "class"]
+        ]
 
         # Infer
-        ts_encoded = self.encoder(ts=ts, days=days, mask=mask)
+        ts_encoded = self.encoder(ts=ts, positions=positions, mask=mask)
         y_hat = self.decoder(x=ts_encoded, mask=mask)
 
         # Reshape
@@ -157,17 +159,19 @@ class Classifier(L.LightningModule):
         self.train_conf_mat.reset()
         self.train_labels.clear()
 
-    def _get_attention_maps(self, ts, days, mask):
+    def _get_attention_maps(self, ts, positions, mask):
         for l in self.encoder.transformer_encoder.layers:
             patch_attention(l.self_attn)
 
-        return self.encoder.get_attention_maps(ts, days, mask)
+        return self.encoder.get_attention_maps(ts, positions, mask)
 
     def validation_step(self, batch, batch_idx):
-        ts, days, mask, y = [batch[k] for k in ["ts", "days", "mask", "class"]]
+        ts, positions, days, mask, y = [
+            batch[k] for k in ["ts", "positions", "days", "mask", "class"]
+        ]
 
         # Infer
-        ts_encoded = self.encoder(ts=ts, days=days, mask=mask)
+        ts_encoded = self.encoder(ts=ts, positions=positions, mask=mask)
         y_hat = self.decoder(x=ts_encoded, mask=mask)
 
         # Reshape
@@ -199,13 +203,15 @@ class Classifier(L.LightningModule):
             )
 
         # Save data for attention maps
-        attn_maps = self._get_attention_maps(ts, days, mask)
-        self.batch_attn.append(resample(
-           attention_map=attn_maps.cpu().numpy(),
-           days=days.cpu().numpy(),
-           masks=mask.cpu().numpy(),
-           targets=y.cpu().numpy(),
-        ))
+        attn_maps = self._get_attention_maps(ts, positions, mask)
+        self.batch_attn.append(
+            resample(
+                attention_map=attn_maps.cpu().numpy(),
+                days=days.cpu().numpy(),
+                masks=mask.cpu().numpy(),
+                targets=y.cpu().numpy(),
+            )
+        )
 
     def on_validation_epoch_end(self):
         fig_ = sns.heatmap(
@@ -243,9 +249,7 @@ class Classifier(L.LightningModule):
 
             for i, ci in enumerate(self.classes):
                 attn_fig = plot_attention(
-                    batch_attn_maps_df.query(f'target == {i}'), 
-                    'month',
-                    ci
+                    batch_attn_maps_df.query(f"target == {i}"), "month", ci
                 )
 
                 self.logger.experiment.add_figure(
