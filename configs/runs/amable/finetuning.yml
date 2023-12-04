@@ -11,7 +11,7 @@ data:
     num_workers: 20
     batch_size: 256
     subsample: true
-    records_frac: 0.3
+    records_frac: 0.05
     classes:
       - other
       - ble_dur

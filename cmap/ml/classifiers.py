@@ -13,7 +13,7 @@ from torchmetrics.classification import MulticlassConfusionMatrix, MulticlassF1S
 
 
 from cmap.ml.losses import FocalLoss
-from cmap.utils.attention import patch_attention, plot_attention
+from cmap.utils.attention import patch_attention, plot_attention, resample, merge
 from cmap.utils.distributions import get_dist_plot
 
 logger = logging.getLogger("cmap.ml.modules")
@@ -75,7 +75,7 @@ class Classifier(L.LightningModule):
 
         # data
         self.val_emb = []
-        self.val_batches = []
+        self.batch_attn = []
         self.train_labels = []
         self.val_labels = []
 
@@ -199,15 +199,13 @@ class Classifier(L.LightningModule):
             )
 
         # Save data for attention maps
-        attn_maps = self._get_attention_maps(ts, days, mask).mean(dim=-1)
-        self.val_batches.append(
-            {
-                "days": days.cpu().numpy(),
-                "y": y.cpu().numpy(),
-                "mask": mask.cpu().numpy(),
-                "attn_maps": attn_maps.cpu().numpy(),
-            }
-        )
+        attn_maps = self._get_attention_maps(ts, days, mask)
+        self.batch_attn.append(resample(
+           attention_map=attn_maps.cpu().numpy(),
+           days=days.cpu().numpy(),
+           masks=mask.cpu().numpy(),
+           targets=y.cpu().numpy(),
+        ))
 
     def on_validation_epoch_end(self):
         fig_ = sns.heatmap(
@@ -240,27 +238,18 @@ class Classifier(L.LightningModule):
                 global_step=self.current_epoch,
             )
 
-        if len(self.val_batches) > 0:
-            batch = self.val_batches.pop()
-            attn_maps, days, mask, y = [
-                batch[k] for k in ["attn_maps", "days", "mask", "y"]
-            ]
-            class_ids, idxs = np.unique(y, return_index=True)
-            for ci, i in zip(class_ids, idxs):
-                class_name = self.classes[ci]
-                sample_mask = mask[i]
+        if len(self.batch_attn) > 0:
+            batch_attn_maps_df = merge(self.batch_attn)
+
+            for i, ci in enumerate(self.classes):
                 attn_fig = plot_attention(
-                    attention_map=attn_maps[i][
-                        :,
-                        : sample_mask.sum(),
-                        : sample_mask.sum(),
-                    ],
-                    days=days[i][: sample_mask.sum()],
-                    post_title=class_name,
+                    batch_attn_maps_df.query(f'target == {i}'), 
+                    'month',
+                    ci
                 )
 
                 self.logger.experiment.add_figure(
-                    f"Attention Maps/{class_name}",
+                    f"Attention Maps/{ci}",
                     attn_fig,
                     self.current_epoch,
                 )
@@ -275,6 +264,7 @@ class Classifier(L.LightningModule):
             )
 
         self.val_labels.clear()
+        self.batch_attn.clear()
         self.val_conf_mat.reset()
         self.val_emb.clear()
 

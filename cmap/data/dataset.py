@@ -3,7 +3,7 @@ from datetime import datetime
 from os.path import join
 from pprint import pformat
 from random import random, sample
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -34,13 +34,16 @@ class ChunkDataset(IterableDataset):
         self,
         features_root: str,
         indexes: pd.DataFrame,
+        temperatures_root : Optional[str] = None,
         start_month: int = 11,
         end_month: int = 12,
         n_steps: int = 3,
         standardize: bool = False,
+        augment : bool = False,
     ):
         self.features_root = features_root
         self.indexes = indexes.sort_values([CHUNK_ID_COL, START_COL])
+        self.temperatures_root = temperatures_root
         self.start_month = start_month
         self.end_month = end_month
         self.max_n_days = (
@@ -51,6 +54,7 @@ class ChunkDataset(IterableDataset):
             + 1
         ) // n_steps
         self.standardize = standardize
+        self.augment = augment
 
         logger.debug(f"Time Series sampled on {self.max_n_days} days")
 
@@ -67,9 +71,11 @@ class ChunkDataset(IterableDataset):
 
 
         # data augmentation
-        sigma = 1e-2
-        clip = 5e-2
-        ts  = (ts + np.clip(np.random.normal(0, sigma, size=ts.shape), -1 * clip, clip)).astype(np.float32)
+        if self.augment:
+            sigma = 1e-2
+            clip =  3e-2
+            ts  = (ts + np.clip(np.random.normal(0, sigma, size=ts.shape), -1 * clip, clip)).astype(np.float32)
+        
         # Days normalizatioin to ref date
         days_norm = (
             days - datetime(year=season - 1, month=self.start_month, day=1)
@@ -146,8 +152,13 @@ class ChunkDataset(IterableDataset):
 
                 if len(records_features_df[POINT_ID_COL].unique()) > 1:
                     raise ValueError(
-                        f"Chunk size {record_idx[SIZE_COL]} sampled two points {records_features_df[POINT_ID_COL].unique()}\n{records_features_df}"
+                        f"Chunk size {record_idx[SIZE_COL]} sampled two points"
+                        + f"{records_features_df[POINT_ID_COL].unique()}\n{records_features_df}"
                     )
+
+               
+
+
 
                 yield records_features_df
 
