@@ -250,11 +250,15 @@ class Classifier(L.LightningModule):
             class_ids, idxs = np.unique(y, return_index=True)
             for ci, i in zip(class_ids, idxs):
                 class_name = self.classes[ci]
+                sample_mask = mask[i]
                 attn_fig = plot_attention(
-                    attn_maps[i],
-                    days[i],
-                    mask[i],
-                    class_name,
+                    attention_map=attn_maps[i][
+                        :,
+                        : sample_mask.sum(),
+                        : sample_mask.sum(),
+                    ],
+                    days=days[i][: sample_mask.sum()],
+                    post_title=class_name,
                 )
 
                 self.logger.experiment.add_figure(

@@ -26,11 +26,7 @@ class SaveAttentionMapHook:
         self.outputs = []
 
 
-def plot_attention(attention_map, days, mask, post_title: str = ""):
-    attention_map = attention_map[:, : mask.sum(), : mask.sum()].mean(-2)
-    days = days[: mask.sum()]
-    max_days = len(mask)
-
+def plot_attention(attention_map, days, post_title: str = "", max_days=398):
     data = dict(enumerate(attention_map))
     data["days"] = days
 
