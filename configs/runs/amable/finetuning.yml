@@ -1,9 +1,8 @@
 trainer:
   callbacks: 
       class_path: pytorch_lightning.callbacks.LearningRateMonitor
-  max_epochs: 100
+  max_epochs: 200
   precision: 32
-  gradient_clip_val : 0.5
   detect_anomaly: true
 data:
   class_path: cmap.data.modules.LabelledDataModule
@@ -12,7 +11,7 @@ data:
     num_workers: 20
     batch_size: 256
     subsample: true
-    records_frac: 0.2
+    records_frac: 0.3
     classes:
       - other
       - ble_dur

@@ -25,7 +25,7 @@ from cmap.utils.constants import (
 logger = logging.getLogger("cmap.data.ChunkDataset")
 # logger.addHandler(logging.FileHandler("dataset.log"))
 REFERENCE_YEAR = 2023
-MIN_DAYS = 30
+MIN_DAYS = 80
 SEASONS = [2018, 2019, 2020, 2021]
 
 
@@ -65,6 +65,11 @@ class ChunkDataset(IterableDataset):
         else:
             ts /= 10_000
 
+
+        # data augmentation
+        sigma = 1e-2
+        clip = 5e-2
+        ts  = (ts + np.clip(np.random.normal(0, sigma, size=ts.shape), -1 * clip, clip)).astype(np.float32)
         # Days normalizatioin to ref date
         days_norm = (
             days - datetime(year=season - 1, month=self.start_month, day=1)
