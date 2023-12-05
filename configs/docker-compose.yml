@@ -2,12 +2,16 @@ version: '3.1'
 services:
   db:
     image: postgres
-    restart: alwaysa
+    container_name: crops_db
+    restart: always
     environment:
       POSTGRES_PASSWORD: cmap2023
       POSTGRES_USER: michel
       POSTGRES_DB: crops
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
+      - ${PWD}/configs/init.sql:/docker-entrypoint-initdb.d/init.sql
       - /mnt/sda/geowatch/datasets/hackathon/crop_mapping/pgdata:/var/lib/postgresql/data/pgdata
+    ports:
+      - 6666:5432
 
