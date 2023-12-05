@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from os.path import join
 from pprint import pformat
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -24,7 +24,7 @@ logger = logging.getLogger("cmap.data.ChunkDataset")
 # logger.addHandler(logging.FileHandler("dataset.log"))
 REFERENCE_YEAR = 2023
 MIN_DAYS = 30
-SEASONS = set([2018, 2019, 2020, 2021])
+SEASONS = [2018, 2019, 2020, 2021]
 
 
 class ChunkDataset(IterableDataset):
@@ -32,7 +32,7 @@ class ChunkDataset(IterableDataset):
         self,
         features_root: str,
         indexes: pd.DataFrame,
-        seasons: Set[int] = SEASONS,
+        seasons: List[int] = SEASONS,
         temperatures_root: Optional[str] = None,
         start_month: int = 11,
         end_month: int = 12,
@@ -224,7 +224,7 @@ class ChunkLabeledDataset(ChunkDataset):
         indexes: pd.DataFrame,
         classes: List[str],
         label_to_class: Dict[str, int],
-        seasons: Set[int] = SEASONS,
+        seasons: List[int] = SEASONS,
         temperatures_root: Optional[str] = None,
         start_month: int = 11,
         end_month: int = 12,

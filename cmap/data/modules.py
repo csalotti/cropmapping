@@ -4,7 +4,7 @@ import logging
 from glob import glob
 from os.path import join, basename
 import shutil
-from typing import List, Optional, Set
+from typing import List
 from functools import partial
 
 import pandas as pd
@@ -141,8 +141,8 @@ class LabelledDataModule(SITSDataModule):
             "eval": join(data_root, "eval", "labels"),
         }
         self.seasons = {
-            "train": set(train_seasons),
-            "eval": set(val_seasons),
+            "train": train_seasons,
+            "eval": val_seasons,
         }
         self.classes = classes
         self.classes_config = classes_config
@@ -164,7 +164,7 @@ class LabelledDataModule(SITSDataModule):
                     shutil.copy(f, new_path)
 
     def get_dataset(
-        self, features_root, labels_root: str, seasons: Set[int], augment: bool = False
+        self, features_root, labels_root: str, seasons: List[int], augment: bool = False
     ):
         indexes = pd.read_json(join(features_root, "indexes.json"))
 
