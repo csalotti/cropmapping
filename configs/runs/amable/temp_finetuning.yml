@@ -1,0 +1,68 @@
+trainer:
+  callbacks: 
+      class_path: pytorch_lightning.callbacks.LearningRateMonitor
+  max_epochs: 200
+  precision: 32
+  detect_anomaly: true
+data:
+  class_path: cmap.data.modules.LabelledDataModule
+  init_args:
+    data_root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_sorted
+    train_seasons:
+      - 2019
+      - 2020
+    val_seasons:
+      - 2021 
+    use_temp: true
+    num_workers: 20
+    batch_size: 256
+    subsample: true
+    records_frac: 0.05
+    classes:
+      - other
+      - ble_dur
+      - ble_tendre
+      - mais
+      - orge
+      - colza
+      - tournesol
+model:
+  class_path: cmap.ml.classifiers.Classifier
+  init_args:
+    encoder:
+      class_path : cmap.ml.encoders.TransformerEncoder
+      init_args:
+        position_encoder:
+          class_path : cmap.ml.embeddings.position.PositionalEncoding
+          init_args:
+            d_model: 256
+            tau : 1000.0
+            max_len: 397 
+        bands_encoder:
+          class_path : cmap.ml.embeddings.bands.PatchBandsEncoding
+          init_args:
+            channels:
+              - 32
+              - 64
+              - 256
+            kernels:
+              - 5
+              - 5
+        n_att_head: 8
+        n_att_layers: 4
+        dropout_p: 0.1
+    decoder:
+      class_path: cmap.ml.decoders.MulticlassClassification      
+      init_args:
+        hidden: 256 
+        num_classes: 7
+    min_lr : 0.00001
+    max_lr : 0.0001
+    class_weights:
+      other: 0.03
+      ble_tendre: 0.03
+      ble_dur : 0.57
+      mais : 0.04
+      orge: 0.05
+      colza : 0.11
+      tournesol: 0.17
