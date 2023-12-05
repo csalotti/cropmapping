@@ -16,6 +16,7 @@ class MulticlassClassification(nn.Module):
 
         x = x - mask  # mask invalid timesteps
         x, _ = torch.max(x, dim=1)  # max-pooling
-        x = self.linear(x)
+       
+        x = self.linear(x.float())
 
         return x

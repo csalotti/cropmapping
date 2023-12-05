@@ -103,17 +103,15 @@ class Classifier(L.LightningModule):
 
         # Metrics
         loss = self.criterion(y_hat, y)
-        f1_score = self.train_f1(y_hat_cls, y)
+        f1_score = self.train_f1.update(y_hat_cls, y)
         self.train_conf_mat.update(y_hat, y)
 
         # Logging
-        self.log_dict(
-            {
-                "Losses/train": loss,
-                "F1/train": f1_score,
-            },
-            on_step=True,
-            on_epoch=False,
+        self.log(
+            "Losses/train",
+            loss,
+            on_step=False,
+            on_epoch=True,
         )
 
         # Data
@@ -141,7 +139,7 @@ class Classifier(L.LightningModule):
         )
 
         self.logger.experiment.add_scalars(
-            "F1/epoch",
+            "F1",
             {"train": self.train_f1.compute()},
             global_step=self.current_epoch,
         )
@@ -180,15 +178,13 @@ class Classifier(L.LightningModule):
 
         # Metrics
         loss = self.criterion(y_hat, y)
-        f1_score = self.val_f1(y_hat_cls, y)
+        f1_score = self.val_f1.update(y_hat_cls, y)
 
-        self.log_dict(
-            {
-                "Losses/val": loss,
-                "F1/val": f1_score,
-            },
-            on_step=True,
-            on_epoch=False,
+        self.log(
+            "Losses/val",
+            loss,
+            on_step=False,
+            on_epoch=True,
         )
 
         self.val_conf_mat.update(y_hat, y)
@@ -203,15 +199,16 @@ class Classifier(L.LightningModule):
             )
 
         # Save data for attention maps
-        attn_maps = self._get_attention_maps(ts, positions, mask)
-        self.batch_attn.append(
-            resample(
-                attention_map=attn_maps.cpu().numpy(),
-                days=days.cpu().numpy(),
-                masks=mask.cpu().numpy(),
-                targets=y.cpu().numpy(),
+        if (self.current_epoch > 0) or (batch_idx == 0):
+            attn_maps = self._get_attention_maps(ts, positions, mask)
+            self.batch_attn.append(
+                resample(
+                    attention_map=attn_maps.cpu().numpy(),
+                    days=days.cpu().numpy(),
+                    masks=mask.cpu().numpy(),
+                    targets=y.cpu().numpy(),
+                )
             )
-        )
 
     def on_validation_epoch_end(self):
         fig_ = sns.heatmap(
@@ -230,7 +227,7 @@ class Classifier(L.LightningModule):
             self.current_epoch,
         )
         self.logger.experiment.add_scalars(
-            "F1/epoch",
+            "F1",
             {"val": self.val_f1.compute()},
             global_step=self.current_epoch,
         )

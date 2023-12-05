@@ -63,7 +63,7 @@ class TransformerEncoder(nn.Module):
 
     def forward(self, ts: Tensor, positions: Tensor, mask: Tensor):
         mask = mask == 0
-
+        
         x_position_emb = self.position_encoder(positions)
         x_bands_emb = self.bands_encoder(ts)
 

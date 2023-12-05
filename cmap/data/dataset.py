@@ -23,7 +23,7 @@ from cmap.utils.constants import (
 logger = logging.getLogger("cmap.data.ChunkDataset")
 # logger.addHandler(logging.FileHandler("dataset.log"))
 REFERENCE_YEAR = 2023
-MIN_DAYS = 30
+MIN_DAYS = 10
 SEASONS = [2018, 2019, 2020, 2021]
 
 
@@ -58,16 +58,16 @@ class ChunkDataset(IterableDataset):
 
         logger.debug(f"Time Series sampled on {self.max_n_positions} days")
 
-    def transforms(self, season_features_df: pd.DataFrame, season: int):
-        days = season_features_df[DATE_COL].copy()  # T
-        ts = season_features_df[ALL_BANDS].values.astype(np.float32)  # T, B
+    def transforms(self, ts, dates, season: int, temperatures):
+       
+        ts = ts.astype(np.float32)
 
         # Bands standardization
         if self.standardize:
             ts -= np.mean(ts, axis=0)
             ts /= np.std(ts, axis=0)
         else:
-            ts /= 10_000
+            ts /= 10_000.0
 
         # data augmentation
         if self.augment:
@@ -78,15 +78,17 @@ class ChunkDataset(IterableDataset):
             ).astype(np.float32)
 
         # Days normalizatioin to ref date
-        days_norm = (
-            days - datetime(year=season - 1, month=self.start_month, day=1)
+        days = (
+            dates - datetime(year=season - 1, month=self.start_month, day=1)
         ).dt.days.values
 
+        # GDD computation
+        if temperatures is not None:
+            temperatures = np.cumsum(temperatures)[days]
+        
         # Positions
-        positions = (
-            season_features_df[TEMP_COL].values if self.temperatures_root else days_norm
-        )
-
+        positions = temperatures if temperatures is not None else days
+        
         # Constant padding to fit fixed size
         n_positions = len(positions)
         ts_padded = np.pad(
@@ -100,14 +102,19 @@ class ChunkDataset(IterableDataset):
             constant_values=0,
         )
         days_padded = np.pad(
-            days_norm,
+            days,
             (0, self.max_n_positions - n_positions),
             constant_values=0,
         )
-        mask = np.zeros(self.max_n_positions)
+        mask = np.zeros(self.max_n_positions, dtype='uint8')
         mask[:n_positions] = 1
 
-        return ts_padded, positions_padded, days_padded, mask
+        return (
+            ts_padded,
+            positions_padded,
+            days_padded,
+            mask,
+            )
 
     def _read_chunk(self, chunk_id: int) -> TextFileReader:
         date_col_idx = (
@@ -187,30 +194,22 @@ class ChunkDataset(IterableDataset):
                     if len(season_features_df) <= MIN_DAYS:
                         continue
 
+                    ts = season_features_df[ALL_BANDS].values
+                    dates = season_features_df[DATE_COL]
+                    temperatures = None
+
                     # Augment with temperatures
                     if self.temperatures_root:
                         season_temp_df = record_temp_df.query(
                             self.__season_filter(season)
                         ).sort_values(DATE_COL)
 
-                        season_temp_df[TEMP_COL] = season_temp_df[TEMP_COL].cumsum()
+                        temperatures = season_temp_df[TEMP_COL].values
 
-                        season_features_aug_df = season_features_df.merge(
-                            season_temp_df,
-                            on=DATE_COL,
-                            how="inner",
-                        )
 
-                        if len(season_features_aug_df) < len(season_features_df):
-                            raise ValueError(
-                                f"Record {poi_id} for season {season} misses "
-                                + f"{len(season_features_df) - len(season_features_aug_df)} temperatures"
-                            )
-
-                        season_features_df = season_features_aug_df
 
                     ts, positions, days, mask = self.transforms(
-                        season_features_df, season
+                        ts=ts, dates=dates, temperatures=temperatures, season=season,
                     )
 
                     yield poi_id, season, ts, positions, days, mask

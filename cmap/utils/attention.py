@@ -41,7 +41,7 @@ def resample(attention_map, days, masks, targets, ref_month=11, ref_year=2023):
     for attn_maps, d, m, t in zip(attention_map, days, masks, targets):
         attn_maps = attn_maps[:, : m.sum(), : m.sum()].mean(axis=1)
         data = dict(enumerate(attn_maps))
-        data["days"] = d
+        data["days"] = d[:m.sum()]
         df = pd.DataFrame(data).melt(
             id_vars="days",
             var_name="layer",
@@ -98,7 +98,7 @@ def plot_attention(attn_maps_df, step_name: str, post_title: str = ""):
         # Fill the area under the line
         plt.fill_between(range(1, 14), 0, values_norm, alpha=0.2)
 
-    g.set(title="Average Attention Map {post_title}", ylim=(0, 1))
+    g.set(title=f"Average Attention Map {post_title}", ylim=(0, 1))
     plt.legend(loc="upper left", bbox_to_anchor=(1, 1), title="Layers")
     plt.tight_layout()
 
