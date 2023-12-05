@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from os.path import join
 from pprint import pformat
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 import numpy as np
 import pandas as pd
@@ -14,10 +14,8 @@ from cmap.utils.constants import (
     ALL_BANDS,
     CHUNK_ID_COL,
     DATE_COL,
-    LABEL_COL,
     POINT_ID_COL,
     TEMP_COL,
-    SEASON_COL,
     SIZE_COL,
     START_COL,
 )
@@ -26,7 +24,7 @@ logger = logging.getLogger("cmap.data.ChunkDataset")
 # logger.addHandler(logging.FileHandler("dataset.log"))
 REFERENCE_YEAR = 2023
 MIN_DAYS = 30
-SEASONS = [2018, 2019, 2020, 2021]
+SEASONS = set([2018, 2019, 2020, 2021])
 
 
 class ChunkDataset(IterableDataset):
@@ -34,7 +32,7 @@ class ChunkDataset(IterableDataset):
         self,
         features_root: str,
         indexes: pd.DataFrame,
-        seasons: List[int] = SEASONS,
+        seasons: Set[int] = SEASONS,
         temperatures_root: Optional[str] = None,
         start_month: int = 11,
         end_month: int = 12,
@@ -222,11 +220,11 @@ class ChunkLabeledDataset(ChunkDataset):
     def __init__(
         self,
         features_root: str,
-        labels: pd.DataFrame,
+        labels: Dict[str, Dict[int, str]],
         indexes: pd.DataFrame,
         classes: List[str],
         label_to_class: Dict[str, int],
-        seasons: List[int] = SEASONS,
+        seasons: Set[int] = SEASONS,
         temperatures_root: Optional[str] = None,
         start_month: int = 11,
         end_month: int = 12,
@@ -245,31 +243,29 @@ class ChunkLabeledDataset(ChunkDataset):
             standardize=standardize,
             augment=augment,
         )
-        self.labels_df = labels
+        self.labels = labels
         self.classes = {cn: i for i, cn in enumerate(classes)}
         self.label_to_class = label_to_class
 
     def __iter__(self):
         for poi_id, season, ts, positions, days, mask in super().__iter__():
-            label = self.labels_df.query(
-                f"({POINT_ID_COL} == {poi_id}) & ({SEASON_COL} == {season})"
-            )[LABEL_COL].iloc[0]
+            label = self.labels[poi_id].get(season)
+            if label is not None:
+                class_id = np.array([self.classes[label]])
 
-            class_id = np.array([self.classes[label]])
+                output = {
+                    "positions": positions,
+                    "days": days,
+                    "mask": mask,
+                    "ts": ts,
+                    "class": class_id,
+                }
 
-            output = {
-                "positions": positions,
-                "days": days,
-                "mask": mask,
-                "ts": ts,
-                "class": class_id,
-            }
+                tensor_output = {
+                    key: torch.from_numpy(value) for key, value in output.items()
+                }
 
-            tensor_output = {
-                key: torch.from_numpy(value) for key, value in output.items()
-            }
-
-            yield tensor_output
+                yield tensor_output
 
 
 class ChunkMaskedDataset(ChunkDataset):

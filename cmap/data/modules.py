@@ -1,9 +1,10 @@
+from collections import defaultdict
 import json
 import logging
 from glob import glob
 from os.path import join, basename
 import shutil
-from typing import List, Optional
+from typing import List, Optional, Set
 from functools import partial
 
 import pandas as pd
@@ -140,8 +141,8 @@ class LabelledDataModule(SITSDataModule):
             "eval": join(data_root, "eval", "labels"),
         }
         self.seasons = {
-            "train": train_seasons,
-            "eval": val_seasons,
+            "train": set(train_seasons),
+            "eval": set(val_seasons),
         }
         self.classes = classes
         self.classes_config = classes_config
@@ -163,7 +164,7 @@ class LabelledDataModule(SITSDataModule):
                     shutil.copy(f, new_path)
 
     def get_dataset(
-        self, features_root, labels_root: str, seasons: List[int], augment: bool = False
+        self, features_root, labels_root: str, seasons: Set[int], augment: bool = False
     ):
         indexes = pd.read_json(join(features_root, "indexes.json"))
 
@@ -174,7 +175,9 @@ class LabelledDataModule(SITSDataModule):
         labels[LABEL_COL] = labels[LABEL_COL].map(
             lambda x: self.label_to_class.get(x, "other")
         )
-        labels = labels.query(f"{LABEL_COL} in {self.classes}")
+        labels = labels.query(
+            f"({LABEL_COL} in {self.classes}) & ({SEASON_COL} in {seasons})"
+        )
 
         # Subsample other class to be 1% highe than second top
         if self.subsample:
@@ -194,12 +197,17 @@ class LabelledDataModule(SITSDataModule):
                     [LABEL_COL, SEASON_COL], group_keys=False
                 ).apply(lambda x: x.sample(frac=self.records_frac))
 
-        indexes = indexes[indexes[POINT_ID_COL].isin(labels[POINT_ID_COL])]
+        # Labels as hashmapa
+        labels_hmap = defaultdict(dict)
+        for pid, s, l in labels[[POINT_ID_COL, SEASON_COL, LABEL_COL]].values:
+            labels_hmap[pid][s] = l
+
+        indexes = indexes[indexes[POINT_ID_COL].isin(labels_hmap)]
         temperatures = join(features_root, "temperatures") if self.use_temp else None
 
         return ChunkLabeledDataset(
             features_root=features_root,
-            labels=labels,
+            labels=labels_hmap,
             seasons=seasons,
             indexes=indexes,
             temperatures_root=temperatures,
