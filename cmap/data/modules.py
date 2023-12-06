@@ -10,6 +10,7 @@ from functools import partial
 import pandas as pd
 import pytorch_lightning as L
 import multiprocessing
+from sqlalchemy import create_engine
 import torch
 import yaml
 from torch.utils.data import DataLoader
@@ -18,6 +19,8 @@ from torch.utils.data.datapipes.iter.combinatorics import ShufflerIterDataPipe
 from cmap.data.dataset import ChunkLabeledDataset, ChunkMaskedDataset
 import os
 from glob import glob
+from cmap.data.sql import SQLDataset
+from cmap.data.transforms import labels_subsampling
 from cmap.utils.chunk import preprocessing
 from cmap.utils.constants import (
     LABEL_COL,
@@ -31,7 +34,7 @@ logger = logging.getLogger("cmap.data.module")
 # logger.addHandler(logging.FileHandler("datamodule.log"))
 
 
-class SITSDataModule(L.LightningDataModule):
+class CSVDataModule(L.LightningDataModule):
     def __init__(
         self,
         train_features_root: str,
@@ -111,7 +114,7 @@ class SITSDataModule(L.LightningDataModule):
         )
 
 
-class LabelledDataModule(SITSDataModule):
+class LabelledDataModule(CSVDataModule):
     def __init__(
         self,
         data_root: str,
@@ -233,7 +236,7 @@ class LabelledDataModule(SITSDataModule):
             raise NotImplementedError("No implementation for stage {stage}")
 
 
-class MaskedDataModule(SITSDataModule):
+class MaskedDataModule(CSVDataModule):
     def __init__(
         self,
         data_root: str,
@@ -272,3 +275,87 @@ class MaskedDataModule(SITSDataModule):
             self.val_dataset = self.get_dataset(self.features_roots["eval"])
         else:
             raise NotImplementedError("No implementation for stage {stage}")
+
+
+class SQLDataModule(L.LightningDataModule):
+    def __init__(
+        self,
+        database_url: str,
+        classes: List[str],
+        classes_config: str = "configs/rpg_codes.yml",
+        sample: bool = True,
+        fraction: float = 1.0,
+        batch_size: int = 32,
+        num_workers: int = 3,
+    ):
+        L.LightningDataModule.__init__(self)
+
+        # Data
+        self.classes = classes
+        self.classes_config = classes_config
+
+        # Hyperparams
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+
+        # Subsampling
+        self.sample = sample
+        self.fraction = fraction
+
+        self.engine = create_engine(database_url)
+
+    def prepare_data(self) -> None:
+        super().prepare_data()
+        # Map codes to labels
+        with open(self.classes_config, "r") as f:
+            class_to_label = yaml.safe_load(f)
+            self.label_to_class = {v: k for k, vs in class_to_label.items() for v in vs}
+
+    def setup(self, stage: str):
+        if stage == "fit":
+            labels = pd.read_sql("labels", self.engine)
+            labels[LABEL_COL] = labels[LABEL_COL].map(self.label_to_class)
+            train_labels = labels_subsampling(
+                labels.query("stage == 'train'"),
+                self.fraction,
+            ).to_dict(orient="records")
+            val_labels = labels_subsampling(
+                labels.query("stage == 'val'"),
+                self.fraction,
+            ).to_dict(orient="records")
+
+            self.train_dataset = SQLDataset(
+                sql_engine=self.engine,
+                features="points",
+                labels=train_labels,
+                classes=self.classes,
+                augment=True,
+            )
+
+            self.val_dataset = SQLDataset(
+                sql_engine=self.engine,
+                features="points",
+                labels=val_labels,
+                classes=self.classes,
+            )
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            persistent_workers=True,
+            shuffle=True,
+            drop_last=True,
+            pin_memory=torch.cuda.is_available(),
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            persistent_workers=True,
+            drop_last=True,
+            pin_memory=torch.cuda.is_available(),
+        )

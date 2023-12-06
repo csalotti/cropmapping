@@ -10,6 +10,7 @@ import torch
 from pandas.io.parsers.readers import TextFileReader
 from torch.utils.data import IterableDataset
 
+from cmap.data.transforms import ts_transforms
 from cmap.utils.constants import (
     ALL_BANDS,
     CHUNK_ID_COL,
@@ -55,66 +56,6 @@ class ChunkDataset(IterableDataset):
         ) // n_steps
         self.standardize = standardize
         self.augment = augment
-
-        logger.debug(f"Time Series sampled on {self.max_n_positions} days")
-
-    def transforms(self, ts, dates, season: int, temperatures):
-       
-        ts = ts.astype(np.float32)
-
-        # Bands standardization
-        if self.standardize:
-            ts -= np.mean(ts, axis=0)
-            ts /= np.std(ts, axis=0)
-        else:
-            ts /= 10_000.0
-
-        # data augmentation
-        if self.augment:
-            sigma = 1e-2
-            clip = 3e-2
-            ts = (
-                ts + np.clip(np.random.normal(0, sigma, size=ts.shape), -1 * clip, clip)
-            ).astype(np.float32)
-
-        # Days normalizatioin to ref date
-        days = (
-            dates - datetime(year=season - 1, month=self.start_month, day=1)
-        ).dt.days.values
-
-        # GDD computation
-        if temperatures is not None:
-            temperatures = np.cumsum(temperatures)[days]
-        
-        # Positions
-        positions = temperatures if temperatures is not None else days
-        
-        # Constant padding to fit fixed size
-        n_positions = len(positions)
-        ts_padded = np.pad(
-            ts,
-            np.array([(0, self.max_n_positions - n_positions), (0, 0)]),
-            constant_values=0,
-        )
-        positions_padded = np.pad(
-            np.array(positions),
-            (0, self.max_n_positions - n_positions),
-            constant_values=0,
-        )
-        days_padded = np.pad(
-            days,
-            (0, self.max_n_positions - n_positions),
-            constant_values=0,
-        )
-        mask = np.zeros(self.max_n_positions, dtype='uint8')
-        mask[:n_positions] = 1
-
-        return (
-            ts_padded,
-            positions_padded,
-            days_padded,
-            mask,
-            )
 
     def _read_chunk(self, chunk_id: int) -> TextFileReader:
         date_col_idx = (
@@ -206,10 +147,15 @@ class ChunkDataset(IterableDataset):
 
                         temperatures = season_temp_df[TEMP_COL].values
 
-
-
-                    ts, positions, days, mask = self.transforms(
-                        ts=ts, dates=dates, temperatures=temperatures, season=season,
+                    ts, positions, days, mask = ts_transforms(
+                        ts=ts,
+                        dates=dates,
+                        temperatures=temperatures,
+                        season=season,
+                        start_month=self.start_month,
+                        max_n_positions=self.max_n_positions,
+                        standardize=self.standardize,
+                        augment=self.augment,
                     )
 
                     yield poi_id, season, ts, positions, days, mask
@@ -222,7 +168,6 @@ class ChunkLabeledDataset(ChunkDataset):
         labels: Dict[str, Dict[int, str]],
         indexes: pd.DataFrame,
         classes: List[str],
-        label_to_class: Dict[str, int],
         seasons: List[int] = SEASONS,
         temperatures_root: Optional[str] = None,
         start_month: int = 11,
@@ -244,7 +189,6 @@ class ChunkLabeledDataset(ChunkDataset):
         )
         self.labels = labels
         self.classes = {cn: i for i, cn in enumerate(classes)}
-        self.label_to_class = label_to_class
 
     def __iter__(self):
         for poi_id, season, ts, positions, days, mask in super().__iter__():

@@ -17,7 +17,8 @@ tensorboard = "^2.15.1"
 torchmetrics = "^1.2.0"
 pyyaml = "^6.0.1"
 seaborn = "^0.13.0"
-psycopg2 = "^2.9.9"
+psycopg2-binary = "^2.9.9"
+sqlalchemy = "^2.0.23"
 
 
 [tool.poetry.group.dev.dependencies]
