@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Dict, List, Optional, Union
 import pandas as pd
 import numpy as np
@@ -8,7 +9,16 @@ from torch.utils.data import Dataset
 from sqlalchemy import create_engine
 from cmap.data.transforms import ts_transforms
 
-from cmap.utils.constants import ALL_BANDS, POINT_ID_COL, DATE_COL, TEMP_COL
+from cmap.utils.constants import (
+    ALL_BANDS,
+    LABEL_COL,
+    POINT_ID_COL,
+    DATE_COL,
+    SEASON_COL,
+    TEMP_COL,
+)
+
+MIN_DAYS = 10
 
 
 class SQLDataset(Dataset):
@@ -17,8 +27,10 @@ class SQLDataset(Dataset):
         db_url: str,
         features: str,
         labels: List[Dict[str, Union[str, int]]],
+        seasons: List[int],
         classes: List[str],
         temperatures: Optional[str] = None,
+        chunk_size: int = 10,
         ref_year: int = 2023,
         start_month: int = 11,
         end_month: int = 12,
@@ -29,8 +41,13 @@ class SQLDataset(Dataset):
         # Data
         self.features = features
         self.temperatures = temperatures
-        self.labels = labels
+        self.seasons = seasons
         self.classes = {cn: i for i, cn in enumerate(classes)}
+
+        # Labels as hashmapa
+        self.labels = defaultdict(dict)
+        for l in labels:
+            self.labels[l[POINT_ID_COL]][l[SEASON_COL]] = l[LABEL_COL]
 
         # Dates and season norm
         self.start_month = start_month
@@ -42,6 +59,7 @@ class SQLDataset(Dataset):
             ).days
             + 1
         ) // n_steps
+        self.chunk_size = chunk_size
 
         # Processing
         self.standardize = standardize
@@ -57,56 +75,71 @@ class SQLDataset(Dataset):
         )
         self.sql_engine.dispose(close=True)
 
-    def get_sequence(self, table: str, poi_id: str, season: int) -> pd.DataFrame:
-        query = (
-            f"SELECT * from {table} "
-            + f"WHERE {POINT_ID_COL} = '{poi_id}'"
-            + f" AND {DATE_COL} >= '{season - 1}-{self.start_month}-01'"
-            + f" AND {DATE_COL} <= '{season}-{self.end_month}-01'"
-        )
+    def get_sequence(self, table: str, points: List[str]) -> pd.DataFrame:
+        pids = ",".join(map(lambda i: f"'{i}'", points))
+        query = f"SELECT * from {table} " + f"WHERE {POINT_ID_COL} = ({pids})"
         return pd.read_sql(query, self.sql_engine)
-
-    def __len__(self):
-        return len(self.labels)
 
     def __getitem__(self, idx):
         # Split data among workers
 
-        poi_id, season, label = [
-            self.labels[idx][k] for k in ["poi_id", "season", "label"]
-        ]
+        worker_info = torch.utils.data.get_worker_info()
+        worker_id = worker_info.id
+        num_workers = worker_info.num_workers
 
-        season_features_df = self.get_sequence(self.features, poi_id, season)
+        worker_pids = range(worker_id, len(self.labels), num_workers)
+        worker_pids = np.array(list(self.labels.keys()))[worker_pids]
 
-        ts = season_features_df[ALL_BANDS].values
-        dates = season_features_df[DATE_COL]
-        temperatures = None
+        for i in range(len(worker_pids) // self.chunk_size):
+            current_ids = worker_pids[
+                self.chunk_size * i : min(self.chunk_size * (i + 1), len(worker_pids))
+            ]
 
-        # Augment with temperatures
-        if self.temperatures:
-            temperatures = self.get_sequence(self.temperatures, poi_id, season)
-            temperatures = temperatures[TEMP_COL].values
+            chunk_features_df = self.get_sequence(self.features, current_ids)
 
-        ts, positions, days, mask = ts_transforms(
-            ts=ts,
-            dates=dates,
-            temperatures=temperatures,
-            season=season,
-            start_month=self.start_month,
-            max_n_positions=self.max_n_positions,
-            standardize=self.standardize,
-            augment=self.augment,
-        )
+            for _, poi_df in chunk_features_df.groupby(POINT_ID_COL):
+                for season in self.seasons:
+                    season_features_df = poi_df.query(
+                        f"date >= {season - 1}-{self.start_month}-01"
+                        + f"AND date <= {season}-{self.end_month}-01"
+                    )
 
-        class_id = np.array([self.classes[label]])
-        output = {
-            "positions": positions,
-            "days": days,
-            "mask": mask,
-            "ts": ts,
-            "class": class_id,
-        }
+                    if len(season_features_df) < MIN_DAYS:
+                        continue
 
-        tensor_output = {key: torch.from_numpy(value) for key, value in output.items()}
+                    ts = season_features_df[ALL_BANDS].values
+                    dates = season_features_df[DATE_COL]
+                    temperatures = None
 
-        return tensor_output
+                    # Augment with temperatures
+                    if self.temperatures:
+                        temperatures = self.get_sequence(
+                            self.temperatures, poi_id, season
+                        )
+                        temperatures = temperatures[TEMP_COL].values
+
+                    ts, positions, days, mask = ts_transforms(
+                        ts=ts,
+                        dates=dates,
+                        temperatures=temperatures,
+                        season=season,
+                        start_month=self.start_month,
+                        max_n_positions=self.max_n_positions,
+                        standardize=self.standardize,
+                        augment=self.augment,
+                    )
+
+                    class_id = np.array([self.classes[label]])
+                    output = {
+                        "positions": positions,
+                        "days": days,
+                        "mask": mask,
+                        "ts": ts,
+                        "class": class_id,
+                    }
+
+                    tensor_output = {
+                        key: torch.from_numpy(value) for key, value in output.items()
+                    }
+
+                    yield tensor_output

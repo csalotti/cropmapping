@@ -282,28 +282,34 @@ class SQLDataModule(L.LightningDataModule):
         self,
         database_url: str,
         classes: List[str],
+        train_seasons: List[int] = [2017, 2018, 2019, 2020],
+        val_seasons: List[int] = [2021],
         classes_config: str = "configs/rpg_codes.yml",
         sample: bool = True,
         fraction: float = 1.0,
         batch_size: int = 32,
         num_workers: int = 3,
+        chunk_size: int = 10,
     ):
         L.LightningDataModule.__init__(self)
 
         # Data
         self.classes = classes
         self.classes_config = classes_config
+        self.train_seasons = train_seasons
+        self.val_season = val_seasons
 
         # Hyperparams
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.chunk_size = chunk_size
 
         # Subsampling
         self.sample = sample
         self.fraction = fraction
 
         # SQL
-        self.database_url =database_url
+        self.database_url = database_url
         self.engine = create_engine(database_url)
 
     def prepare_data(self) -> None:
@@ -331,17 +337,20 @@ class SQLDataModule(L.LightningDataModule):
                 db_url=self.database_url,
                 features="points",
                 labels=train_labels,
+                seasons=self.train_seasons,
                 classes=self.classes,
                 augment=True,
+                chunk_size=self.chunk_size,
             )
 
             self.val_dataset = SQLDataset(
                 db_url=self.database_url,
                 features="points",
                 labels=val_labels,
+                seasons=self.train_seasons,
                 classes=self.classes,
+                chunk_size=self.chunk_size,
             )
-
 
     def train_dataloader(self):
         return DataLoader(
