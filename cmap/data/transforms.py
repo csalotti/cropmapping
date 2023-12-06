@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 from numpy.typing import NDArray
 
-from cmap.utils.constants import LABEL_COL
+from cmap.utils.constants import LABEL_COL, SEASON_COL
 
 
 def labels_subsampling(labels: pd.DataFrame, frac: float):
@@ -20,7 +20,7 @@ def labels_subsampling(labels: pd.DataFrame, frac: float):
     # Subsample dataset respecting distribution of classes
     if frac < 1.0:
         labels = labels.groupby([LABEL_COL, SEASON_COL], group_keys=False).apply(
-            lambda x: x.sample(frac=self.records_frac)
+            lambda x: x.sample(frac=frac)
         )
 
     return labels

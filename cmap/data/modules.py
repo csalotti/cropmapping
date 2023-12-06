@@ -16,7 +16,7 @@ import yaml
 from torch.utils.data import DataLoader
 from torch.utils.data.datapipes.iter.combinatorics import ShufflerIterDataPipe
 
-from cmap.data.dataset import ChunkLabeledDataset, ChunkMaskedDataset
+from cmap.data.chunk import ChunkLabeledDataset, ChunkMaskedDataset
 import os
 from glob import glob
 from cmap.data.sql import SQLDataset
@@ -302,6 +302,8 @@ class SQLDataModule(L.LightningDataModule):
         self.sample = sample
         self.fraction = fraction
 
+        # SQL
+        self.database_url =database_url
         self.engine = create_engine(database_url)
 
     def prepare_data(self) -> None:
@@ -325,7 +327,7 @@ class SQLDataModule(L.LightningDataModule):
             ).to_dict(orient="records")
 
             self.train_dataset = SQLDataset(
-                sql_engine=self.engine,
+                db_url=self.database_url,
                 features="points",
                 labels=train_labels,
                 classes=self.classes,
@@ -333,11 +335,12 @@ class SQLDataModule(L.LightningDataModule):
             )
 
             self.val_dataset = SQLDataset(
-                sql_engine=self.engine,
+                db_url=self.database_url,
                 features="points",
                 labels=val_labels,
                 classes=self.classes,
             )
+
 
     def train_dataloader(self):
         return DataLoader(

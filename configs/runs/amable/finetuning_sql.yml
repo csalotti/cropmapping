@@ -2,17 +2,17 @@ trainer:
   callbacks: 
       class_path: pytorch_lightning.callbacks.LearningRateMonitor
   max_epochs: 200
-  precision: 32
+  precision: 16
   detect_anomaly: true
 data:
   class_path: cmap.data.modules.SQLDataModule
   init_args:
-    database_url: postgresql+psycopg2://michel:cmaps2023@localhost:6666/crops 
-    sample:  True,
-    fraction: 0.3 ,
+    database_url: postgresql+psycopg2://michel:cmap2023@localhost:6666/crops 
+    sample:  true
+    fraction: 0.3 
     num_workers: 20
-    batch_size: 256
-    classees:
+    batch_size: 10
+    classes:
       - other
       - ble_dur
       - ble_tendre
@@ -24,16 +24,24 @@ model:
   class_path: cmap.ml.classifiers.Classifier
   init_args:
     encoder:
-      class_path : cmap.ml.encoders.SITSFormer
+      class_path : cmap.ml.encoders.TransformerEncoder
       init_args:
-        max_n_days: 397
-        d_model: 256
-        band_emb_chanels:
-          - 32
-          - 64
-        band_emb_kernel_size: 
-          - 5
-          - 5
+        position_encoder:
+          class_path : cmap.ml.embeddings.position.PositionalEncoding
+          init_args:
+            d_model: 256
+            tau : 10000.0
+            max_len: 10000
+        bands_encoder:
+          class_path : cmap.ml.embeddings.bands.PatchBandsEncoding
+          init_args:
+            channels:
+              - 32
+              - 64
+              - 256
+            kernels:
+              - 5
+              - 5
         n_att_head: 8
         n_att_layers: 4
         dropout_p: 0.1

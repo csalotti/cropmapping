@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import Dataset
 
 from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
 from cmap.data.transforms import ts_transforms
 
 from cmap.utils.constants import ALL_BANDS, POINT_ID_COL, DATE_COL, TEMP_COL
@@ -14,7 +15,7 @@ from cmap.utils.constants import ALL_BANDS, POINT_ID_COL, DATE_COL, TEMP_COL
 class SQLDataset(Dataset):
     def __init__(
         self,
-        sql_engine,
+        db_url : str,
         features: str,
         labels: List[Dict[str, Union[str, int]]],
         classes: List[str],
@@ -48,22 +49,26 @@ class SQLDataset(Dataset):
         self.augment = augment
 
         # SQL
-        self.engine = sql_engine
+        self.engine = create_engine(db_url, poolclass=NullPool)
+        self.connection = self.engine.connect()
 
     def get_sequence(self, table: str, poi_id: str, season: int) -> pd.DataFrame:
         query = (
             f"SELECT * from {table} "
             + f"WHERE {POINT_ID_COL} = '{poi_id}'"
-            + f" AND {DATE_COL} >= {season - 1}-{self.start_month}-01"
-            + f" AND {DATE_COL} <= {season}-{self.end_month}-01"
+            + f" AND {DATE_COL} >= '{season - 1}-{self.start_month}-01'"
+            + f" AND {DATE_COL} <= '{season}-{self.end_month}-01'"
         )
 
-        return pd.read_sql(query, self.engine)
+        return pd.read_sql(query, self.connection)
+
+    def __del__(self):
+        self.connection.close()
 
     def __len__(self):
         return len(self.labels)
 
-    def __get_item__(self, idx):
+    def __getitem__(self, idx):
         # Split data among workers
 
         poi_id, season, label = [
