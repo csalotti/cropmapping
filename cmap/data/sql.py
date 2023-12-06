@@ -6,7 +6,6 @@ import torch
 from torch.utils.data import Dataset
 
 from sqlalchemy import create_engine
-from sqlalchemy.pool import NullPool, QueuePool
 from cmap.data.transforms import ts_transforms
 
 from cmap.utils.constants import ALL_BANDS, POINT_ID_COL, DATE_COL, TEMP_COL
@@ -49,28 +48,24 @@ class SQLDataset(Dataset):
         self.augment = augment
 
         # SQL
-        self.connection_pool = QueuePool(
-            creator=lambda: create_engine(db_url, poolclass=NullPool).connect(),
-            max_overflow=10,
-            pool_size=5,
-            pool_recycle=3600,
-            pool_timeout=30,
+        self.sql_engine = create_engine(
+            db_url,
+            echo=False,
+            echo_pool=False,
+            fast_executemany=True,
+            pool_size=1,
+            pool_pre_ping=True,
         )
+        self.sql_engine.dispose(close=True)
 
     def get_sequence(self, table: str, poi_id: str, season: int) -> pd.DataFrame:
-        connection = self.connection_pool.connect()
         query = (
             f"SELECT * from {table} "
             + f"WHERE {POINT_ID_COL} = '{poi_id}'"
             + f" AND {DATE_COL} >= '{season - 1}-{self.start_month}-01'"
             + f" AND {DATE_COL} <= '{season}-{self.end_month}-01'"
         )
-        connection.close()
-        return pd.read_sql(query, connection)
-
-    def close_connection(self):
-        # Close the connection pool when done
-        self.connection_pool.dispose()
+        return pd.read_sql(query, self.sql_engine)
 
     def __len__(self):
         return len(self.labels)
