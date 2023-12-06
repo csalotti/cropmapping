@@ -15,7 +15,7 @@ from cmap.utils.constants import ALL_BANDS, POINT_ID_COL, DATE_COL, TEMP_COL
 class SQLDataset(Dataset):
     def __init__(
         self,
-        db_url : str,
+        db_url: str,
         features: str,
         labels: List[Dict[str, Union[str, int]]],
         classes: List[str],
@@ -49,10 +49,14 @@ class SQLDataset(Dataset):
         self.augment = augment
 
         # SQL
-        self.engine = create_engine(db_url, poolclass=NullPool)
-        self.connection = self.engine.connect()
+        self.db_url = db_url
 
-    def get_sequence(self, table: str, poi_id: str, season: int) -> pd.DataFrame:
+    def get_connection(self):
+        return create_engine(self.db_url, poolclass=NullPool).connect()
+
+    def get_sequence(
+        self, table: str, poi_id: str, season: int, connection
+    ) -> pd.DataFrame:
         query = (
             f"SELECT * from {table} "
             + f"WHERE {POINT_ID_COL} = '{poi_id}'"
@@ -60,10 +64,7 @@ class SQLDataset(Dataset):
             + f" AND {DATE_COL} <= '{season}-{self.end_month}-01'"
         )
 
-        return pd.read_sql(query, self.connection)
-
-    def __del__(self):
-        self.connection.close()
+        return pd.read_sql(query, connection)
 
     def __len__(self):
         return len(self.labels)
@@ -75,37 +76,44 @@ class SQLDataset(Dataset):
             self.labels[idx][k] for k in ["poi_id", "season", "label"]
         ]
 
-        season_features_df = self.get_sequence(self.features, poi_id, season)
+        with self.get_connection() as connection:
+            season_features_df = self.get_sequence(
+                self.features, poi_id, season, connection
+            )
 
-        ts = season_features_df[ALL_BANDS].values
-        dates = season_features_df[DATE_COL]
-        temperatures = None
+            ts = season_features_df[ALL_BANDS].values
+            dates = season_features_df[DATE_COL]
+            temperatures = None
 
-        # Augment with temperatures
-        if self.temperatures:
-            temperatures = self.get_sequence(self.temperatures, poi_id, season)
-            temperatures = temperatures[TEMP_COL].values
+            # Augment with temperatures
+            if self.temperatures:
+                temperatures = self.get_sequence(
+                    self.temperatures, poi_id, season, connection
+                )
+                temperatures = temperatures[TEMP_COL].values
 
-        ts, positions, days, mask = ts_transforms(
-            ts=ts,
-            dates=dates,
-            temperatures=temperatures,
-            season=season,
-            start_month=self.start_month,
-            max_n_positions=self.max_n_positions,
-            standardize=self.standardize,
-            augment=self.augment,
-        )
+            ts, positions, days, mask = ts_transforms(
+                ts=ts,
+                dates=dates,
+                temperatures=temperatures,
+                season=season,
+                start_month=self.start_month,
+                max_n_positions=self.max_n_positions,
+                standardize=self.standardize,
+                augment=self.augment,
+            )
 
-        class_id = np.array([self.classes[label]])
-        output = {
-            "positions": positions,
-            "days": days,
-            "mask": mask,
-            "ts": ts,
-            "class": class_id,
-        }
+            class_id = np.array([self.classes[label]])
+            output = {
+                "positions": positions,
+                "days": days,
+                "mask": mask,
+                "ts": ts,
+                "class": class_id,
+            }
 
-        tensor_output = {key: torch.from_numpy(value) for key, value in output.items()}
+            tensor_output = {
+                key: torch.from_numpy(value) for key, value in output.items()
+            }
 
-        return tensor_output
+            return tensor_output
