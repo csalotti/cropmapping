@@ -17,7 +17,7 @@ from cmap.utils.constants import (
 
 def write_chunks(connection, root, type, cols, table_name):
     insert_query = sql.SQL(
-        f"INSERT INTO {table_name}\n" + f"(){','.join(cols)})\n" + f"VALUES %s"
+        f"INSERT INTO {table_name}\n" + f"({','.join(cols)})\n" + f"VALUES %s"
     )
     cursor = connection.cursor()
     for stage in ["train", "eval"]:
@@ -25,7 +25,7 @@ def write_chunks(connection, root, type, cols, table_name):
         files = glob(os.path.join(root, stage, type, "*.csv"))
         for file in files:
             print(f"\t\t{file}")
-            df = pd.read_csv(file, index_col=0, parse_dates=["date"])
+            df = pd.read_csv(file, index_col=0, parse_dates=["date"] if 'date' in cols else None)
             df = df[cols]
             data_to_insert = [tuple(row) for row in df.values]
             execute_values(
@@ -56,8 +56,8 @@ if __name__ == "__main__":
     labels_col = [POINT_ID_COL, SEASON_COL, LABEL_COL]
     temp_cols = [POINT_ID_COL, DATE_COL, "tile_id", TEMP_COL]
 
-    print("Start features")
-    write_chunks(conn, ROOT, "features", features_col, "points")
+    #print("Start features")
+    #write_chunks(conn, ROOT, "features", features_col, "points")
     print("Start labels")
     write_chunks(conn, ROOT, "labels", labels_col, "labels")
     print("Start temperatures")

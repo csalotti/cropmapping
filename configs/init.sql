@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS split (
 	id 	SERIAL PRIMARY KEY,
  	poi_id 	VARCHAR(32),
 	stage	VARCHAR(5)	
+);
 
 CREATE TABLE IF NOT EXISTS temperatures (
   	id 		SERIAL PRIMARY KEY,
