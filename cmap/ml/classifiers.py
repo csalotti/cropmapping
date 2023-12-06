@@ -245,15 +245,17 @@ class Classifier(L.LightningModule):
             batch_attn_maps_df = merge(self.batch_attn)
 
             for i, ci in enumerate(self.classes):
-                attn_fig = plot_attention(
-                    batch_attn_maps_df.query(f"target == {i}"), "month", ci
-                )
+                class_attn_maps_df = batch_attn_maps_df.query(f"target == {i}")
+                if len(class_attn_maps_df) > 0:
+                    attn_fig = plot_attention(
+                         class_attn_maps_df, "month", ci,
+                    )
 
-                self.logger.experiment.add_figure(
-                    f"Attention Maps/{ci}",
-                    attn_fig,
-                    self.current_epoch,
-                )
+                    self.logger.experiment.add_figure(
+                        f"Attention Maps/{ci}",
+                        attn_fig,
+                        self.current_epoch,
+                    )
 
         # Label distribution
         if (self.current_epoch == 0) and (len(self.val_labels) > 0):

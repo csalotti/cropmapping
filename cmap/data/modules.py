@@ -317,6 +317,7 @@ class SQLDataModule(L.LightningDataModule):
         if stage == "fit":
             labels = pd.read_sql("labels", self.engine)
             labels[LABEL_COL] = labels[LABEL_COL].map(self.label_to_class)
+            labels = labels.query(f"{LABEL_COL} in {self.classes}")
             train_labels = labels_subsampling(
                 labels.query("stage == 'train'"),
                 self.fraction,

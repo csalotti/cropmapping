@@ -11,7 +11,7 @@ data:
     sample:  true
     fraction: 0.3 
     num_workers: 20
-    batch_size: 10
+    batch_size: 256
     classes:
       - other
       - ble_dur

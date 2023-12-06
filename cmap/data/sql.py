@@ -31,7 +31,7 @@ class SQLDataset(Dataset):
         self.features = features
         self.temperatures = temperatures
         self.labels = labels
-        self.classes = dict(enumerate(classes))
+        self.classes = { cn : i for i, cn in enumerate(classes)}
 
         # Dates and season norm
         self.start_month = start_month
