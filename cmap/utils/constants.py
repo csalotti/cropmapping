@@ -14,15 +14,15 @@ SEASON_COL = "season"
 TEMP_COL = "temperature"
 
 # Bands
-BAND_2_COL = "R20m_B02"
-BAND_3_COL = "R20m_B03"
-BAND_4_COL = "R20m_B04"
-BAND_5_COL = "R20m_B05"
-BAND_6_COL = "R20m_B06"
-BAND_7_COL = "R20m_B07"
-BAND_8_COL = "R20m_B8A"
-BAND_11_COL = "R20m_B11"
-BAND_12_COL = "R20m_B12"
+BAND_2_COL = "r20m_b02"
+BAND_3_COL = "r20m_b03"
+BAND_4_COL = "r20m_b04"
+BAND_5_COL = "r20m_b05"
+BAND_6_COL = "r20m_b06"
+BAND_7_COL = "r20m_b07"
+BAND_8_COL = "r20m_b8a"
+BAND_11_COL = "r20m_b11"
+BAND_12_COL = "r20m_b12"
 
 ALL_BANDS = [
     BAND_2_COL,
