@@ -52,7 +52,6 @@ class SQLDataset(Dataset):
             db_url,
             echo=False,
             echo_pool=False,
-            fast_executemany=True,
             pool_size=1,
             pool_pre_ping=True,
         )
