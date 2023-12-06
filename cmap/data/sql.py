@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import Dataset
 
 from sqlalchemy import create_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, QueuePool
 from cmap.data.transforms import ts_transforms
 
 from cmap.utils.constants import ALL_BANDS, POINT_ID_COL, DATE_COL, TEMP_COL
@@ -31,7 +31,7 @@ class SQLDataset(Dataset):
         self.features = features
         self.temperatures = temperatures
         self.labels = labels
-        self.classes = { cn : i for i, cn in enumerate(classes)}
+        self.classes = {cn: i for i, cn in enumerate(classes)}
 
         # Dates and season norm
         self.start_month = start_month
@@ -49,22 +49,28 @@ class SQLDataset(Dataset):
         self.augment = augment
 
         # SQL
-        self.db_url = db_url
+        self.connection_pool = QueuePool(
+            creator=lambda: create_engine(db_url, poolclass=NullPool).connect(),
+            max_overflow=10,
+            pool_size=5,
+            pool_recycle=3600,
+            pool_timeout=30,
+        )
 
-    def get_connection(self):
-        return create_engine(self.db_url, poolclass=NullPool).connect()
-
-    def get_sequence(
-        self, table: str, poi_id: str, season: int, connection
-    ) -> pd.DataFrame:
+    def get_sequence(self, table: str, poi_id: str, season: int) -> pd.DataFrame:
+        connection = self.connection_pool.connect()
         query = (
             f"SELECT * from {table} "
             + f"WHERE {POINT_ID_COL} = '{poi_id}'"
             + f" AND {DATE_COL} >= '{season - 1}-{self.start_month}-01'"
             + f" AND {DATE_COL} <= '{season}-{self.end_month}-01'"
         )
-
+        connection.close()
         return pd.read_sql(query, connection)
+
+    def close_connection(self):
+        # Close the connection pool when done
+        self.connection_pool.dispose()
 
     def __len__(self):
         return len(self.labels)
@@ -76,44 +82,37 @@ class SQLDataset(Dataset):
             self.labels[idx][k] for k in ["poi_id", "season", "label"]
         ]
 
-        with self.get_connection() as connection:
-            season_features_df = self.get_sequence(
-                self.features, poi_id, season, connection
-            )
+        season_features_df = self.get_sequence(self.features, poi_id, season)
 
-            ts = season_features_df[ALL_BANDS].values
-            dates = season_features_df[DATE_COL]
-            temperatures = None
+        ts = season_features_df[ALL_BANDS].values
+        dates = season_features_df[DATE_COL]
+        temperatures = None
 
-            # Augment with temperatures
-            if self.temperatures:
-                temperatures = self.get_sequence(
-                    self.temperatures, poi_id, season, connection
-                )
-                temperatures = temperatures[TEMP_COL].values
+        # Augment with temperatures
+        if self.temperatures:
+            temperatures = self.get_sequence(self.temperatures, poi_id, season)
+            temperatures = temperatures[TEMP_COL].values
 
-            ts, positions, days, mask = ts_transforms(
-                ts=ts,
-                dates=dates,
-                temperatures=temperatures,
-                season=season,
-                start_month=self.start_month,
-                max_n_positions=self.max_n_positions,
-                standardize=self.standardize,
-                augment=self.augment,
-            )
+        ts, positions, days, mask = ts_transforms(
+            ts=ts,
+            dates=dates,
+            temperatures=temperatures,
+            season=season,
+            start_month=self.start_month,
+            max_n_positions=self.max_n_positions,
+            standardize=self.standardize,
+            augment=self.augment,
+        )
 
-            class_id = np.array([self.classes[label]])
-            output = {
-                "positions": positions,
-                "days": days,
-                "mask": mask,
-                "ts": ts,
-                "class": class_id,
-            }
+        class_id = np.array([self.classes[label]])
+        output = {
+            "positions": positions,
+            "days": days,
+            "mask": mask,
+            "ts": ts,
+            "class": class_id,
+        }
 
-            tensor_output = {
-                key: torch.from_numpy(value) for key, value in output.items()
-            }
+        tensor_output = {key: torch.from_numpy(value) for key, value in output.items()}
 
-            return tensor_output
+        return tensor_output
