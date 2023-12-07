@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS points (
 	id 		SERIAL PRIMARY KEY,
  	poi_id		VARCHAR(32),
-        tile_id		VARCHAR(5),	
+  tile_id		VARCHAR(5),	
 	date 		TIMESTAMP,
 	aws_index 	INTEGER,
 	R20m_SCL  	INTEGER,
@@ -32,17 +32,17 @@ CREATE TABLE IF NOT EXISTS split (
 );
 
 CREATE TABLE IF NOT EXISTS temperatures (
-  	id 		SERIAL PRIMARY KEY,
+  id 		BIGSERIAL PRIMARY KEY,
  	poi_id 		VARCHAR(32),
 	date 		TIMESTAMP,
-        tile_id 	VARCHAR(5),	
-  	temperature 	FLOAT
+  tile_id 	VARCHAR(5),	
+  temperature 	FLOAT
 );
 
 CREATE TABLE IF NOT EXISTS precipitations(
-  	id 		SERIAL PRIMARY KEY,
+  id 		BIGSERIAL PRIMARY KEY,
  	poi_id 		VARCHAR(32),
 	date 		TIMESTAMP,
-        tile_id 	VARCHAR(5),	
-  	volume		INTEGER
+  tile_id 	VARCHAR(5),	
+  volume		INTEGER
 );

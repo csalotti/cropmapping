@@ -1,9 +1,6 @@
-from glob import glob
-from os.path import join, basename
-from os import listdir
+from os.path import basename
 
 import pandas as pd
-from pandas.io.parquet import json
 
 from cmap.utils.constants import (
     CHUNK_ID_COL,

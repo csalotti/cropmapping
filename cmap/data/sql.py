@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Union
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from pandas.io.parsers.readers import DataFrame
 import torch
 from torch.utils.data import IterableDataset
 
@@ -80,6 +81,12 @@ class SQLDataset(IterableDataset):
         query = f"SELECT * from {table} " + f"WHERE {POINT_ID_COL} in ({pids})"
         return pd.read_sql(query, self.sql_engine)
 
+    def filter_season(self, df: pd.DataFrame, season: int) -> pd.DataFrame:
+        return df.query(
+            f"(date >= '{season - 1}-{self.start_month}-01')"
+            + f" & (date <= '{season}-{self.end_month}-01')"
+        )
+
     def __iter__(self):
         # Split data among workers
 
@@ -96,27 +103,28 @@ class SQLDataset(IterableDataset):
             ]
 
             chunk_features_df = self.get_sequence(self.features, current_ids)
+            chunk_temperature = (
+                self.get_sequence(self.temperatures, current_ids)
+                if self.temperatures
+                else None
+            )
 
             for poi_id, poi_df in chunk_features_df.groupby(POINT_ID_COL):
-                for season in self.seasons:
-                    season_features_df = poi_df.query(
-                        f"(date >= '{season - 1}-{self.start_month}-01')"
-                        + f" & (date <= '{season}-{self.end_month}-01')"
-                    )
-
-                    if (len(season_features_df) < MIN_DAYS) or (season not in self.labels[poi_id]):
+                for season, label in self.labels[poi_id].items():
+                    season_features_df = self.filter_season(poi_df, season)
+                    if len(season_features_df) < MIN_DAYS:
                         continue
 
                     ts = season_features_df[ALL_BANDS].values
                     dates = season_features_df[DATE_COL]
                     temperatures = None
-                    label = self.labels[poi_id][season]
 
                     # Augment with temperatures
-                    if self.temperatures:
-                        temperatures = self.get_sequence(
-                            self.temperatures, poi_id, season
+                    if chunk_temperature is not None:
+                        temperatures = chunk_temperature.query(
+                            f"{POINT_ID_COL} == {poi_id}"
                         )
+                        temperatures = self.filter_season(temperatures, season)
                         temperatures = temperatures[TEMP_COL].values
 
                     ts, positions, days, mask = ts_transforms(

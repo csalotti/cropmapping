@@ -10,8 +10,8 @@ data:
     database_url: postgresql+psycopg2://michel:cmap2023@localhost:6666/crops 
     sample:  true
     fraction: 0.3 
-    num_workers: 16
-    chunk_size: 10
+    num_workers: 8
+    chunk_size: 16
     batch_size: 128 
     train_seasons:
       - 2019

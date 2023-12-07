@@ -25,7 +25,6 @@ logger = logging.getLogger("cmap.data.ChunkDataset")
 # logger.addHandler(logging.FileHandler("dataset.log"))
 REFERENCE_YEAR = 2023
 MIN_DAYS = 10
-SEASONS = [2018, 2019, 2020, 2021]
 
 
 class ChunkDataset(IterableDataset):
@@ -33,11 +32,12 @@ class ChunkDataset(IterableDataset):
         self,
         features_root: str,
         indexes: pd.DataFrame,
-        seasons: List[int] = SEASONS,
+        seasons: Dict[str, List[int]],
         temperatures_root: Optional[str] = None,
         start_month: int = 11,
         end_month: int = 12,
         n_steps: int = 3,
+        chunk_size: int = 10,
         standardize: bool = False,
         augment: bool = False,
     ):
@@ -54,6 +54,7 @@ class ChunkDataset(IterableDataset):
             ).days
             + 1
         ) // n_steps
+        self.chunk_size = chunk_size
         self.standardize = standardize
         self.augment = augment
 
@@ -99,66 +100,88 @@ class ChunkDataset(IterableDataset):
             chunk_records = sub_indexes_df.query(f"{CHUNK_ID_COL} == {chunk_id}")
             cur_row = 0
 
-            # Iterate over records
-            for record_idx in chunk_records.to_dict(orient="records"):
-                logger.debug(f"Record : {pformat(record_idx)}")
-                logger.debug(f"Last row id {cur_row}")
-
-                # Get single point time series data
-                poi_id = record_idx[POINT_ID_COL]
-                record_start_row = record_idx[START_COL]
-                chunk_size = record_idx[SIZE_COL]
-                if record_start_row != cur_row:
-                    chunk_reader.get_chunk(record_start_row - cur_row)
-
-                records_features_df = chunk_reader.get_chunk(chunk_size + 1)
-                cur_row = record_start_row + chunk_size + 1
-
-                if len(records_features_df[POINT_ID_COL].unique()) > 1:
-                    raise ValueError(
-                        f"Chunk size {record_idx[SIZE_COL]} sampled two points"
-                        + f"{records_features_df[POINT_ID_COL].unique()}\n{records_features_df}"
+            chunk_poi_ids = chunk_records[POINT_ID_COL].values
+            for i in range(0, len(chunk_poi_ids) // self.chunk_size):
+                sub_chunk_ids = chunk_poi_ids[
+                    (i * self.chunk_size) : min(
+                        (i + 1) * self.chunk_size,
+                        len(chunk_poi_ids),
                     )
+                ]
 
+                sub_chunk_temps = None
                 if self.temperatures_root:
-                    record_temp_df = pd.read_csv(
-                        join(self.temperatures_root, f"{poi_id}.csv"),
-                        parse_dates=[DATE_COL],
+                    sub_chunk_temps = pd.concat(
+                        [
+                            pd.read_csv(
+                                join(self.temperatures_root, f"{id}.csv"),
+                                parse_dates=[DATE_COL],
+                            )
+                            for id in sub_chunk_ids
+                        ],
+                        ignore_index=True,
                     )
+                # Iterate over records
+                sub_chunk_records = chunk_records.query(
+                    f"{POINT_ID_COL} is in {sub_chunk_ids}"
+                ).to_dict(orient="records")
 
-                for season in self.seasons:
-                    season_features_df = records_features_df.query(
-                        self.__season_filter(season)
-                    ).sort_values(DATE_COL)
+                for record_idx in sub_chunk_records:
+                    # Get single point time series data
+                    poi_id = record_idx[POINT_ID_COL]
+                    record_start_row = record_idx[START_COL]
+                    chunk_size = record_idx[SIZE_COL]
+                    if record_start_row != cur_row:
+                        chunk_reader.get_chunk(record_start_row - cur_row)
 
-                    # Invalid record
-                    if len(season_features_df) <= MIN_DAYS:
-                        continue
+                    records_features_df = chunk_reader.get_chunk(chunk_size + 1)
+                    cur_row = record_start_row + chunk_size + 1
 
-                    ts = season_features_df[ALL_BANDS].values
-                    dates = season_features_df[DATE_COL]
-                    temperatures = None
+                    if len(records_features_df[POINT_ID_COL].unique()) > 1:
+                        raise ValueError(
+                            f"Chunk size {record_idx[SIZE_COL]} sampled two points"
+                            + f"{records_features_df[POINT_ID_COL].unique()}\n{records_features_df}"
+                        )
 
-                    # Augment with temperatures
-                    if self.temperatures_root:
-                        season_temp_df = record_temp_df.query(
+                    record_temperatures = None
+                    if sub_chunk_temps is not None:
+                        record_temperatures = sub_chunk_temps.query(
+                            f"{POINT_ID_COL} == {poi_id}"
+                        )
+
+                    for season in self.seasons[poi_id]:
+                        season_features_df = records_features_df.query(
                             self.__season_filter(season)
                         ).sort_values(DATE_COL)
 
-                        temperatures = season_temp_df[TEMP_COL].values
+                        # Invalid record
+                        if len(season_features_df) <= MIN_DAYS:
+                            continue
 
-                    ts, positions, days, mask = ts_transforms(
-                        ts=ts,
-                        dates=dates,
-                        temperatures=temperatures,
-                        season=season,
-                        start_month=self.start_month,
-                        max_n_positions=self.max_n_positions,
-                        standardize=self.standardize,
-                        augment=self.augment,
-                    )
+                        ts = season_features_df[ALL_BANDS].values
+                        dates = season_features_df[DATE_COL]
+                        temperatures = None
 
-                    yield poi_id, season, ts, positions, days, mask
+                        # Augment with temperatures
+                        if record_temperatures is not None:
+                            temperatures = record_temperatures.query(
+                                self.__season_filter(season)
+                            ).sort_values(DATE_COL)
+
+                            temperatures = temperatures[TEMP_COL].values
+
+                        ts, positions, days, mask = ts_transforms(
+                            ts=ts,
+                            dates=dates,
+                            temperatures=temperatures,
+                            season=season,
+                            start_month=self.start_month,
+                            max_n_positions=self.max_n_positions,
+                            standardize=self.standardize,
+                            augment=self.augment,
+                        )
+
+                        yield poi_id, season, ts, positions, days, mask
 
 
 class ChunkLabeledDataset(ChunkDataset):
@@ -168,7 +191,6 @@ class ChunkLabeledDataset(ChunkDataset):
         labels: Dict[str, Dict[int, str]],
         indexes: pd.DataFrame,
         classes: List[str],
-        seasons: List[int] = SEASONS,
         temperatures_root: Optional[str] = None,
         start_month: int = 11,
         end_month: int = 12,
@@ -180,7 +202,7 @@ class ChunkLabeledDataset(ChunkDataset):
             features_root=features_root,
             indexes=indexes,
             temperatures_root=temperatures_root,
-            seasons=seasons,
+            seasons={k: list(v.keys()) for k, v in labels.items()},
             start_month=start_month,
             end_month=end_month,
             n_steps=n_steps,
@@ -211,68 +233,68 @@ class ChunkLabeledDataset(ChunkDataset):
                 yield tensor_output
 
 
-class ChunkMaskedDataset(ChunkDataset):
-    def __init__(
-        self,
-        features_root: str,
-        indexes: pd.DataFrame,
-        temperatures_root: Optional[str] = None,
-        n_bands: int = 9,
-        start_month: int = 11,
-        end_month: int = 12,
-        n_steps: int = 3,
-        standardize: bool = False,
-        ablation: float = 0.15,
-    ):
-        super().__init__(
-            features_root=features_root,
-            indexes=indexes,
-            temperatures_root=temperatures_root,
-            start_month=start_month,
-            end_month=end_month,
-            n_steps=n_steps,
-            standardize=standardize,
-        )
-
-        self.ablation = ablation
-        self.mask = np.random.normal(0, 1e-2, size=n_bands)
-
-    def random_masking(self, ts, ts_length):
-        ts_masked = ts.copy()
-        days_masked = np.array([0] * self.max_n_positions)
-        n_removed_days = int(self.ablation * ts_length)
-
-        # if random() < 0.5:
-        #     start_idx = np.random.choice(range(ts_length - n_removed_days), 1)[0]
-        #     days_masked[start_idx : start_idx + n_removed_days] = 1
-        #     ts_masked[start_idx : start_idx + n_removed_days] = self.mask
-        # else:
-        indexes = np.random.choice(
-            range(ts_length),
-            n_removed_days,
-        )
-        days_masked[indexes] = 1
-        ts_masked[indexes] = self.mask
-
-        return ts_masked, days_masked
-
-    def __iter__(self):
-        for _, season, ts, positions, days, mask in super().__iter__():
-            # Random masking of time stamps
-            ts_masked, loss_mask = self.random_masking(ts, sum(mask))
-
-            output = {
-                "days": days,
-                "positions": positions,
-                "ts": ts_masked,
-                "target": ts,
-                "mask": mask,
-                "loss_mask": loss_mask,
-                "season": np.array([season]),
-            }
-
-            tensor_output = {
-                key: torch.from_numpy(value) for key, value in output.items()
-            }
-
-            yield tensor_output
+# class ChunkMaskedDataset(ChunkDataset):
+#    def __init__(
+#        self,
+#        features_root: str,
+#        indexes: pd.DataFrame,
+#        temperatures_root: Optional[str] = None,
+#        n_bands: int = 9,
+#        start_month: int = 11,
+#        end_month: int = 12,
+#        n_steps: int = 3,
+#        standardize: bool = False,
+#        ablation: float = 0.15,
+#    ):
+#        super().__init__(
+#            features_root=features_root,
+#            indexes=indexes,
+#            temperatures_root=temperatures_root,
+#            start_month=start_month,
+#            end_month=end_month,
+#            n_steps=n_steps,
+#            standardize=standardize,
+#        )
+#
+#        self.ablation = ablation
+#        self.mask = np.random.normal(0, 1e-2, size=n_bands)
+#
+#    def random_masking(self, ts, ts_length):
+#        ts_masked = ts.copy()
+#        days_masked = np.array([0] * self.max_n_positions)
+#        n_removed_days = int(self.ablation * ts_length)
+#
+#        # if random() < 0.5:
+#        #     start_idx = np.random.choice(range(ts_length - n_removed_days), 1)[0]
+#        #     days_masked[start_idx : start_idx + n_removed_days] = 1
+#        #     ts_masked[start_idx : start_idx + n_removed_days] = self.mask
+#        # else:
+#        indexes = np.random.choice(
+#            range(ts_length),
+#            n_removed_days,
+#        )
+#        days_masked[indexes] = 1
+#        ts_masked[indexes] = self.mask
+#
+#        return ts_masked, days_masked
+#
+#    def __iter__(self):
+#        for _, season, ts, positions, days, mask in super().__iter__():
+#            # Random masking of time stamps
+#            ts_masked, loss_mask = self.random_masking(ts, sum(mask))
+#
+#            output = {
+#                "days": days,
+#                "positions": positions,
+#                "ts": ts_masked,
+#                "target": ts,
+#                "mask": mask,
+#                "loss_mask": loss_mask,
+#                "season": np.array([season]),
+#            }
+#
+#            tensor_output = {
+#                key: torch.from_numpy(value) for key, value in output.items()
+#            }
+#
+#            yield tensor_output
