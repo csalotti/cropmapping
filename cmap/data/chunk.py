@@ -120,7 +120,8 @@ class ChunkDataset(IterableDataset):
                             for id in sub_chunk_ids
                         ],
                         ignore_index=True,
-                    )
+                    ).sort_values([DATE_COL])
+
                 # Iterate over records
                 sub_chunk_records = chunk_records.query(
                     f"{POINT_ID_COL} in @sub_chunk_ids"
@@ -134,8 +135,12 @@ class ChunkDataset(IterableDataset):
                     if record_start_row != cur_row:
                         chunk_reader.get_chunk(record_start_row - cur_row)
 
-                    records_features_df = chunk_reader.get_chunk(chunk_size + 1)
-                    records_features_df.columns = records_features_df.columns.str.strip().str.lower()
+                    records_features_df = chunk_reader.get_chunk(
+                        chunk_size + 1
+                    ).sort_values(DATE_COL)
+                    records_features_df.columns = (
+                        records_features_df.columns.str.strip().str.lower()
+                    )
                     cur_row = record_start_row + chunk_size + 1
 
                     if len(records_features_df[POINT_ID_COL].unique()) > 1:
@@ -153,7 +158,7 @@ class ChunkDataset(IterableDataset):
                     for season in self.seasons[poi_id]:
                         season_features_df = records_features_df.query(
                             self.__season_filter(season)
-                        ).sort_values(DATE_COL)
+                        )
 
                         # Invalid record
                         if len(season_features_df) <= MIN_DAYS:
