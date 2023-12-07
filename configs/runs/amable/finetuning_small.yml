@@ -1,0 +1,62 @@
+trainer:
+  callbacks: 
+      class_path: pytorch_lightning.callbacks.LearningRateMonitor
+  max_epochs: 200
+  precision: 32
+  detect_anomaly: true
+data:
+  class_path: cmap.data.modules.SITSDataModule
+  init_args:
+    data_root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/small
+    num_workers: 1
+    batch_size: 10
+    train_seasons:
+      - 2019
+      - 2020
+    val_season:
+      - 2021
+    classees:
+      - other
+      - ble_dur
+      - ble_tendre
+      - mais
+      - orge
+      - colza
+      - tournesol
+model:
+  class_path: cmap.ml.classifiers.Classifier
+  init_args:
+    encoder:
+      class_path : cmap.ml.encoders.TransformerEncoder
+      init_args:
+        position_encoder: 
+          class_path: cmap.ml.embeddings.position.PositionalEncoding
+          init_args: 
+            d_model: 256
+            tau: 10000
+            max_len: 397
+        bands_encoder:
+          class_path: cmap.ml.embeddings.bands.PixelEncoding
+          init_args:
+            sizes:
+              - 8
+              - 32
+              - 64
+              - 128
+              - 256
+        d_model: 256
+        n_att_head: 8
+        n_att_layers: 4
+        dropout_p: 0.1
+    decoder:
+      class_path: cmap.ml.decoders.MLPDecoder
+      init_args:
+          init_args:
+            sizes:
+              - 256
+              - 128
+              - 64
+              - 32
+              - 7
+    min_lr : 0.00001
+    max_lr : 0.0001
