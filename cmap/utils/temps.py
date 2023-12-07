@@ -2,6 +2,9 @@ from glob import glob
 from os.path import join, basename
 import pandas as pd
 import re
+from tqdm import tqdm
+
+from cmap.utils.constants import POINT_ID_COL
 
 KELVIN_CST = 273.15
 
@@ -43,10 +46,25 @@ def get_temps(in_path, out_path):
                 )
 
 
-if __name__ == "__main__":
-    input_root = "/mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_01234"
-    output_root = (
-        "/mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_sorted"
-    )
+def sample_temps(src_root, dst_root, labels):
+    for stage in ["train", "val"]:
+        src_folder = join(
+            src_root, "eval" if (stage == "val") else stage, "features", "temperatures"
+        )
+        ids = labels[stage][POINT_ID_COL].tolist()
+        temps = []
+        for id in tqdm(ids):
+            temps.append(pd.read_csv(join(src_folder, f"{id}.csv")))
+        temp_df = pd.concat(temps, ignore_index=True)
+        temp_df.to_csv(join(dst_root, stage, "temperatures.csv"), index=False)
 
-    get_temps(input_root, output_root)
+
+if __name__ == "__main__":
+    input_root = "/mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_sorted"
+    output_root = "/mnt/sda/geowatch/datasets/hackathon/crop_mapping/small"
+
+    labels = {
+        stage: pd.read_csv(join(output_root, stage, "labels.csv"))
+        for stage in ["train", "val"]
+    }
+    sample_temps(input_root, output_root, labels)
