@@ -1,4 +1,5 @@
 import logging
+from typing import List
 
 import torch
 import torch.nn as nn
@@ -30,10 +31,7 @@ class PatchBandsEncoding(nn.Module):
             nn.BatchNorm1d(channels[1]),
         )
 
-        self.linear = nn.Linear(
-            in_features=channels[1], out_features=channels[2]
-        )
-
+        self.linear = nn.Linear(in_features=channels[1], out_features=channels[2])
 
     def forward(self, input_sequence):
         batch_size = input_sequence.size(0)
@@ -56,3 +54,30 @@ class PatchBandsEncoding(nn.Module):
         obs_embed = obs_embed.view(batch_size, seq_length, -1)
 
         return obs_embed
+
+
+class PixelEncoding(nn.Module):
+    def __init__(self, sizes: List[int]):
+        self.layers = []
+        for i in range(1, len(sizes)):
+            self.layers.append(
+                {
+                    "linear": nn.Linear(
+                        in_features=sizes[i - 1],
+                        out_features=sizes[i],
+                    ),
+                    "batch_norm": nn.BatchNorm1d(sizes[i]),
+                    "relu": nn.ReLU(),
+                }
+            )
+
+    def forward(self, x):
+        for l in self.layers:
+            x = x.permute((0, 2, 1))
+            x = l["linear"](x)
+            x = x.permute((0, 2, 1))
+            x.permute((0, 2, 1))
+            x = l["batch_norm"](x)
+            x = l["relu"](x)
+
+        return x

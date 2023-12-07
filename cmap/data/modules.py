@@ -20,8 +20,9 @@ from cmap.data.chunk import ChunkLabeledDataset, ChunkMaskedDataset
 import os
 from glob import glob
 from cmap.data.sql import SQLDataset
-from cmap.data.transforms import labels_filter
+from cmap.data.transforms import labels_sample
 from cmap.utils.chunk import preprocessing
+from cmap.data.dataset import SITSDataset
 from cmap.utils.constants import (
     LABEL_COL,
     POINT_ID_COL,
@@ -178,12 +179,12 @@ class LabelledDataModule(CSVDataModule):
         labels[LABEL_COL] = labels[LABEL_COL].map(self.label_to_class)
         labels = labels.query(f"{LABEL_COL} in {self.classes}")
 
-        labels = labels_filter(
-                labels,
-                self.records_frac,
-                self.subsample,
-                seasons,
-            )
+        labels = labels_sample(
+            labels,
+            self.records_frac,
+            self.subsample,
+            seasons,
+        )
         # Labels as hashmap
         labels_hmap = defaultdict(dict)
         for pid, s, l in labels[[POINT_ID_COL, SEASON_COL, LABEL_COL]].values:
@@ -306,13 +307,13 @@ class SQLDataModule(L.LightningDataModule):
             labels = pd.read_sql("labels", self.engine)
             labels[LABEL_COL] = labels[LABEL_COL].map(self.label_to_class)
             labels = labels.query(f"{LABEL_COL} in {self.classes}")
-            train_labels = labels_filter(
+            train_labels = labels_sample(
                 labels.query("stage == 'train'"),
                 self.fraction,
                 self.sample,
                 self.train_seasons,
             ).to_dict(orient="records")
-            val_labels = labels_filter(
+            val_labels = labels_sample(
                 labels.query("stage == 'val'"),
                 self.fraction,
                 self.sample,
@@ -338,7 +339,6 @@ class SQLDataModule(L.LightningDataModule):
                 chunk_size=self.chunk_size,
             )
 
-
     def train_dataloader(self):
         ds_shuffled = ShufflerIterDataPipe(
             self.train_dataset,
@@ -346,6 +346,85 @@ class SQLDataModule(L.LightningDataModule):
         )
         return DataLoader(
             ds_shuffled,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            persistent_workers=True,
+            shuffle=True,
+            drop_last=True,
+            pin_memory=torch.cuda.is_available(),
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            persistent_workers=True,
+            drop_last=True,
+            pin_memory=torch.cuda.is_available(),
+        )
+
+
+class SITSDataModule(L.LightningDataModule):
+    def __init__(
+        self,
+        root: str,
+        classes: List[str],
+        train_seasons: List[int] = [2017, 2018, 2019, 2020],
+        val_seasons: List[int] = [2021],
+        include_temperatures: bool = False,
+        fraction: float = 1.0,
+        batch_size: int = 32,
+        num_workers: int = 3,
+        chunk_size: int = 10,
+    ):
+        L.LightningDataModule.__init__(self)
+
+        # Data
+        self.root = root
+        self.classes = classes
+        self.train_seasons = train_seasons
+        self.val_seasons = val_seasons
+        self.include_temperatures = include_temperatures
+
+        # Hyperparams
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.chunk_size = chunk_size
+
+        # Subsampling
+        self.fraction = fraction
+
+    def get_dataset(self, stage: str, seasons: List[int]):
+        # Gather
+        features = pd.read_csv(os.path.join(self.root, stage, "features.csv"))
+        temperatures = (
+            pd.read_csv(os.path.join(self.root, stage, "temperatures.csv"))
+            if self.include_temperatures
+            else None
+        )
+        labels = pd.read_csv(os.path.join(self.root, stage, "labels.csv"))
+
+        # Filter
+        labels = labels_sample(labels, seasons=seasons, fraction=self.fraction)
+        features = features[features[POINT_ID_COL].isin(labels[POINT_ID_COL])]
+
+        return SITSDataset(
+            features,
+            labels,
+            self.classes,
+            temperatures,
+            augment=stage == "train",
+        )
+
+    def setup(self, stage: str):
+        if stage == "fit":
+            self.train_dataset = self.get_dataset("train", self.train_seasons)
+            self.val_dataset = self.get_dataset("val", self.train_seasons)
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             persistent_workers=True,

@@ -7,27 +7,13 @@ from numpy.typing import NDArray
 from cmap.utils.constants import LABEL_COL, SEASON_COL, POINT_ID_COL
 
 
-def labels_filter(labels: pd.DataFrame, frac: float, sample : bool, seasons : List[int]):
+def labels_sample(labels: pd.DataFrame, fraction: float, seasons: List[int]):
     labels = labels.query(f"{SEASON_COL} in {seasons}")
-    
-    # Remove some oveerwhelming other points
-    if sample:
-        labels_poi_df = labels[[POINT_ID_COL, LABEL_COL]] 
-        labels_dist = labels_poi_df.drop_duplicates().value_counts().reset_index()
-        if labels_dist.iloc[0][LABEL_COL] == "other":
-            n_samples = int(1.01 * labels_dist.iloc[1, 1])
-            sub_other_ids = set(labels_poi_df.query(f"{LABEL_COL} == 'other'").sample(n_samples)[POINT_ID_COL].values)
-            labels = pd.concat(
-                [
-                    labels[labels[POINT_ID_COL].isin(sub_other_ids)],
-                    labels.query(f"{LABEL_COL} != 'other'"),
-                ]
-            )
 
     # Subsample dataset respecting distribution of classes
-    if frac < 1.0:
+    if fraction < 1.0:
         labels = labels.groupby([LABEL_COL, SEASON_COL], group_keys=False).apply(
-            lambda x: x.sample(frac=frac)
+            lambda x: x.sample(frac=fraction)
         )
 
     return labels
