@@ -8,10 +8,15 @@ data:
   class_path: cmap.data.modules.LabelledDataModule
   init_args:
     data_root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_sorted
-    num_workers: 20
-    batch_size: 256
+    num_workers: 1
+    batch_size: 10
     subsample: true
     records_frac: 0.05
+    train_seasons:
+      - 2019
+      - 2020
+    val_season:
+      - 2021
     classees:
       - other
       - ble_dur

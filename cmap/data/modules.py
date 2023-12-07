@@ -175,32 +175,16 @@ class LabelledDataModule(CSVDataModule):
         labels = pd.concat(
             [pd.read_csv(f, index_col=0) for f in glob(join(labels_root, "*.csv"))]
         )
-        labels[LABEL_COL] = labels[LABEL_COL].map(
-            lambda x: self.label_to_class.get(x, "other")
-        )
-        labels = labels.query(
-            f"({LABEL_COL} in {self.classes}) & ({SEASON_COL} in {seasons})"
-        )
+        labels[LABEL_COL] = labels[LABEL_COL].map(self.label_to_class)
+        labels = labels.query(f"{LABEL_COL} in {self.classes}")
 
-        # Subsample other class to be 1% highe than second top
-        if self.subsample:
-            labels_dist = labels[LABEL_COL].value_counts().reset_index()
-            if labels_dist.iloc[0][LABEL_COL] == "other":
-                n_samples = int(1.01 * labels_dist.iloc[1, 1])
-                labels = pd.concat(
-                    [
-                        labels.query(f"{LABEL_COL} == 'other'").sample(n_samples),
-                        labels.query(f"{LABEL_COL} != 'other'"),
-                    ]
-                )
-
-            # Subsample dataset respecting distribution of classes
-            if self.records_frac < 1.0:
-                labels = labels.groupby(
-                    [LABEL_COL, SEASON_COL], group_keys=False
-                ).apply(lambda x: x.sample(frac=self.records_frac))
-
-        # Labels as hashmapa
+        labels = labels_filter(
+                labels,
+                self.records_frac,
+                self.subsample,
+                seasons,
+            )
+        # Labels as hashmap
         labels_hmap = defaultdict(dict)
         for pid, s, l in labels[[POINT_ID_COL, SEASON_COL, LABEL_COL]].values:
             labels_hmap[pid][s] = l
@@ -211,11 +195,9 @@ class LabelledDataModule(CSVDataModule):
         return ChunkLabeledDataset(
             features_root=features_root,
             labels=labels_hmap,
-            seasons=seasons,
             indexes=indexes,
             temperatures_root=temperatures,
             classes=self.classes,
-            label_to_class=self.label_to_class,
             augment=augment,
         )
 

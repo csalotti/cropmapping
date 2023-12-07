@@ -14,8 +14,8 @@ data:
     val_seasons:
       - 2021 
     use_temp: true 
-    num_workers: 20
-    batch_size: 256
+    num_workers: 2
+    batch_size: 10
     subsample: true
     records_frac: 0.001
     classes:
