@@ -5,6 +5,7 @@ from torch.utils.data import Dataset
 import pandas as pd
 import numpy as np
 from cmap.data.transforms import ts_transforms
+import torch
 
 from cmap.utils.constants import (
     ALL_BANDS,
@@ -33,7 +34,7 @@ class SITSDataset(Dataset):
         self.temperatures = temperatures
         self.classes = {cn: i for i, cn in enumerate(classes)}
 
-        # Labels as hashmap
+        # Labels  
         self.labels = labels.to_dict(orient="records")
 
         # Dates and season norm
@@ -54,9 +55,12 @@ class SITSDataset(Dataset):
     def filter_season(self, df: pd.DataFrame, poi_id: str, season: int) -> pd.DataFrame:
         return df.query(
             f"{POINT_ID_COL} == '{poi_id}'"
-            + f"(date >= '{season - 1}-{self.start_month}-01')"
-            + f" & (date <= '{season}-{self.end_month}-01')"
+            + f" & ({DATE_COL} >= '{season - 1}-{self.start_month}-01')"
+            + f" & ({DATE_COL} <= '{season}-{self.end_month}-01')"
         )
+
+    def __len__(self):
+        return len(self.labels)
 
     def __getitem__(self, idx):
         poi_id, season, label = [
@@ -74,6 +78,7 @@ class SITSDataset(Dataset):
             temperatures = self.temperatures.query(f"{POINT_ID_COL} == {poi_id}")
             temperatures = self.filter_season(temperatures, poi_id, season)
             temperatures = temperatures[TEMP_COL].values
+
 
         ts, positions, days, mask = ts_transforms(
             ts=ts,
@@ -95,6 +100,7 @@ class SITSDataset(Dataset):
             "class": class_id,
         }
 
+        
         tensor_output = {key: torch.from_numpy(value) for key, value in output.items()}
 
         return tensor_output

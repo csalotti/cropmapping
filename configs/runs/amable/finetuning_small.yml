@@ -7,15 +7,16 @@ trainer:
 data:
   class_path: cmap.data.modules.SITSDataModule
   init_args:
-    data_root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/small
-    num_workers: 1
-    batch_size: 10
+    root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/small
+    include_temperatures: true 
+    num_workers: 16
+    batch_size: 128
     train_seasons:
       - 2019
       - 2020
-    val_season:
+    val_seasons:
       - 2021
-    classees:
+    classes:
       - other
       - ble_dur
       - ble_tendre
@@ -39,7 +40,7 @@ model:
           class_path: cmap.ml.embeddings.bands.PixelEncoding
           init_args:
             sizes:
-              - 8
+              - 9
               - 32
               - 64
               - 128
@@ -49,14 +50,9 @@ model:
         n_att_layers: 4
         dropout_p: 0.1
     decoder:
-      class_path: cmap.ml.decoders.MLPDecoder
+      class_path: cmap.ml.decoders.MulticlassClassification
       init_args:
-          init_args:
-            sizes:
-              - 256
-              - 128
-              - 64
-              - 32
-              - 7
+        hidden: 256
+        num_classes : 7
     min_lr : 0.00001
     max_lr : 0.0001

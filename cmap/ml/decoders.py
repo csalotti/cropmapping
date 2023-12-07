@@ -25,6 +25,7 @@ class MulticlassClassification(nn.Module):
 
 class MLPDecoder(nn.Module):
     def __init__(self, sizes: List[int]):
+        super().__init__()
         layers = []
         for i in range(1, len(sizes)):
             layers.append(nn.Linear(in_features=sizes[i - 1], out_features=sizes[i]))

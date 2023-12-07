@@ -49,9 +49,7 @@ class Classifier(L.LightningModule):
         # labels
         self.classes = classes
         self.n_classes = len(classes)
-        self.classes_weights = torch.FloatTensor(
-            [class_weights[c] for c in classes] if (class_weights is not None) else None
-        )
+        self.classes_weights = torch.FloatTensor([class_weights[c] for c in classes]) if (class_weights is not None) else None
 
         # Optimizationin
         self.min_lr = min_lr
@@ -92,7 +90,7 @@ class Classifier(L.LightningModule):
         ts, positions, mask, y = [
             batch[k] for k in ["ts", "positions", "mask", "class"]
         ]
-
+        
         # Infer
         ts_encoded = self.encoder(ts=ts, positions=positions, mask=mask)
         y_hat = self.decoder(x=ts_encoded, mask=mask)

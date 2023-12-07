@@ -397,13 +397,13 @@ class SITSDataModule(L.LightningDataModule):
 
     def get_dataset(self, stage: str, seasons: List[int]):
         # Gather
-        features = pd.read_csv(os.path.join(self.root, stage, "features.csv"))
+        features = pd.read_csv(os.path.join(self.root, stage, "features.csv"), parse_dates=[DATE_COL], engine="pyarrow")
         temperatures = (
-            pd.read_csv(os.path.join(self.root, stage, "temperatures.csv"))
+            pd.read_csv(os.path.join(self.root, stage, "temperatures.csv"), parse_dates=[DATE_COL], engine="pyarrow")
             if self.include_temperatures
             else None
         )
-        labels = pd.read_csv(os.path.join(self.root, stage, "labels.csv"))
+        labels = pd.read_csv(os.path.join(self.root, stage, "labels.csv"), engine="pyarrow")
 
         # Filter
         labels = labels_sample(labels, seasons=seasons, fraction=self.fraction)

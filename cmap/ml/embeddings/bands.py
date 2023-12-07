@@ -58,26 +58,36 @@ class PatchBandsEncoding(nn.Module):
 
 class PixelEncoding(nn.Module):
     def __init__(self, sizes: List[int]):
-        self.layers = []
+        super().__init__()
+        layers = []
         for i in range(1, len(sizes)):
-            self.layers.append(
-                {
-                    "linear": nn.Linear(
-                        in_features=sizes[i - 1],
-                        out_features=sizes[i],
-                    ),
-                    "batch_norm": nn.BatchNorm1d(sizes[i]),
-                    "relu": nn.ReLU(),
-                }
-            )
+            layers.append(SequenceLinearLayer(sizes[i-1], sizes[i]))
+
+        self.encoder = nn.Sequential(*layers)
+    
+    def forward(self, x):
+        batch_size = x.size(0)
+        seq_length = x.size(1)
+        x = x.view(batch_size*seq_length, -1)
+        x = self.encoder(x)
+        x = x.view(batch_size, seq_length, -1)
+        return x
+
+
+class SequenceLinearLayer(nn.Module):
+    def __init__(self, in_features, out_features):
+        super().__init__()
+        self.linear = nn.Linear(
+                        in_features=in_features,
+                        out_features=out_features,
+                    )
+        self.bn = nn.BatchNorm1d(out_features)
+        self.relu = nn.ReLU()
+
 
     def forward(self, x):
-        for l in self.layers:
-            x = x.permute((0, 2, 1))
-            x = l["linear"](x)
-            x = x.permute((0, 2, 1))
-            x.permute((0, 2, 1))
-            x = l["batch_norm"](x)
-            x = l["relu"](x)
+        x = self.linear(x)
+        x = self.bn(x)
+        x = self.relu(x)
 
         return x
