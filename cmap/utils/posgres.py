@@ -4,6 +4,7 @@ from glob import glob
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import execute_values
+from tqdm import tqdm
 
 from cmap.utils.constants import (
     ALL_BANDS,
@@ -15,16 +16,15 @@ from cmap.utils.constants import (
 )
 
 
-def write_chunks(connection, root, type, cols, table_name):
+def write_chunks(connection, root, type, cols, table_name, stages=['train', 'eval']):
     insert_query = sql.SQL(
         f"INSERT INTO {table_name}\n" + f"({','.join(cols)})\n" + f"VALUES %s"
     )
     cursor = connection.cursor()
-    for stage in ["train", "eval"]:
+    for stage in stages:
         print(f"\t{stage}")
         files = glob(os.path.join(root, stage, type, "*.csv"))
-        for file in files:
-            print(f"\t\t{file}")
+        for file in tqdm(files):
             df = pd.read_csv(file, index_col=0, parse_dates=["date"] if 'date' in cols else None)
             df = df[cols]
             data_to_insert = [tuple(row) for row in df.values]
@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
     #print("Start features")
     #write_chunks(conn, ROOT, "features", features_col, "points")
-    print("Start labels")
-    write_chunks(conn, ROOT, "labels", labels_col, "labels")
+    #print("Start labels")
+    #write_chunks(conn, ROOT, "labels", labels_col, "labels")
     print("Start temperatures")
-    write_chunks(conn, ROOT, "features/temperatures", temp_cols, "temperatures")
+    write_chunks(conn, ROOT, "features/temperatures", temp_cols, "temperatures", stages=['eval'])

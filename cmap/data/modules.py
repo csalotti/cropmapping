@@ -20,7 +20,7 @@ from cmap.data.chunk import ChunkLabeledDataset, ChunkMaskedDataset
 import os
 from glob import glob
 from cmap.data.sql import SQLDataset
-from cmap.data.transforms import labels_subsampling
+from cmap.data.transforms import labels_filter
 from cmap.utils.chunk import preprocessing
 from cmap.utils.constants import (
     LABEL_COL,
@@ -297,7 +297,7 @@ class SQLDataModule(L.LightningDataModule):
         self.classes = classes
         self.classes_config = classes_config
         self.train_seasons = train_seasons
-        self.val_season = val_seasons
+        self.val_seasons = val_seasons
 
         # Hyperparams
         self.batch_size = batch_size
@@ -324,13 +324,17 @@ class SQLDataModule(L.LightningDataModule):
             labels = pd.read_sql("labels", self.engine)
             labels[LABEL_COL] = labels[LABEL_COL].map(self.label_to_class)
             labels = labels.query(f"{LABEL_COL} in {self.classes}")
-            train_labels = labels_subsampling(
+            train_labels = labels_filter(
                 labels.query("stage == 'train'"),
                 self.fraction,
+                self.sample,
+                self.train_seasons,
             ).to_dict(orient="records")
-            val_labels = labels_subsampling(
+            val_labels = labels_filter(
                 labels.query("stage == 'val'"),
                 self.fraction,
+                self.sample,
+                self.val_seasons,
             ).to_dict(orient="records")
 
             self.train_dataset = SQLDataset(
@@ -347,14 +351,19 @@ class SQLDataModule(L.LightningDataModule):
                 db_url=self.database_url,
                 features="points",
                 labels=val_labels,
-                seasons=self.train_seasons,
+                seasons=self.val_seasons,
                 classes=self.classes,
                 chunk_size=self.chunk_size,
             )
 
+
     def train_dataloader(self):
-        return DataLoader(
+        ds_shuffled = ShufflerIterDataPipe(
             self.train_dataset,
+            buffer_size=100,
+        )
+        return DataLoader(
+            ds_shuffled,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             persistent_workers=True,

@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import IterableDataset
 
 from sqlalchemy import create_engine
 from cmap.data.transforms import ts_transforms
@@ -21,7 +21,7 @@ from cmap.utils.constants import (
 MIN_DAYS = 10
 
 
-class SQLDataset(Dataset):
+class SQLDataset(IterableDataset):
     def __init__(
         self,
         db_url: str,
@@ -77,10 +77,10 @@ class SQLDataset(Dataset):
 
     def get_sequence(self, table: str, points: List[str]) -> pd.DataFrame:
         pids = ",".join(map(lambda i: f"'{i}'", points))
-        query = f"SELECT * from {table} " + f"WHERE {POINT_ID_COL} = ({pids})"
+        query = f"SELECT * from {table} " + f"WHERE {POINT_ID_COL} in ({pids})"
         return pd.read_sql(query, self.sql_engine)
 
-    def __getitem__(self, idx):
+    def __iter__(self):
         # Split data among workers
 
         worker_info = torch.utils.data.get_worker_info()
@@ -97,19 +97,20 @@ class SQLDataset(Dataset):
 
             chunk_features_df = self.get_sequence(self.features, current_ids)
 
-            for _, poi_df in chunk_features_df.groupby(POINT_ID_COL):
+            for poi_id, poi_df in chunk_features_df.groupby(POINT_ID_COL):
                 for season in self.seasons:
                     season_features_df = poi_df.query(
-                        f"date >= {season - 1}-{self.start_month}-01"
-                        + f"AND date <= {season}-{self.end_month}-01"
+                        f"(date >= '{season - 1}-{self.start_month}-01')"
+                        + f" & (date <= '{season}-{self.end_month}-01')"
                     )
 
-                    if len(season_features_df) < MIN_DAYS:
+                    if (len(season_features_df) < MIN_DAYS) or (season not in self.labels[poi_id]):
                         continue
 
                     ts = season_features_df[ALL_BANDS].values
                     dates = season_features_df[DATE_COL]
                     temperatures = None
+                    label = self.labels[poi_id][season]
 
                     # Augment with temperatures
                     if self.temperatures:
