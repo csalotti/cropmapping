@@ -51,7 +51,7 @@ def sample_temps(src_root, dst_root, labels):
         src_folder = join(
             src_root, "eval" if (stage == "val") else stage, "features", "temperatures"
         )
-        ids = labels[stage][POINT_ID_COL].tolist()
+        ids = labels[stage][POINT_ID_COL].unique()
         temps = []
         for id in tqdm(ids):
             temps.append(pd.read_csv(join(src_folder, f"{id}.csv")))
