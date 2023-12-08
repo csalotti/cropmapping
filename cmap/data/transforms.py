@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-from typing import List
-from datetime import datetime
+from typing import List, Tuple
+from datetime import date
 from numpy.typing import NDArray
 
 from cmap.utils.constants import LABEL_COL, SEASON_COL, POINT_ID_COL
@@ -28,9 +28,9 @@ def ts_transforms(
     max_n_positions: int = 397,
     standardize: bool = False,
     augment: bool = False,
-):
-    ts = ts.astype(np.float32)
-
+) -> Tuple[
+    NDArray[np.float32], NDArray[np.int32], NDArray[np.int32], NDArray[np.uint8]
+]:
     # Bands standardization
     if standardize:
         ts -= np.mean(ts, axis=0)
@@ -42,12 +42,13 @@ def ts_transforms(
     if augment:
         sigma = 1e-2
         clip = 3e-2
-        ts = (
-            ts + np.clip(np.random.normal(0, sigma, size=ts.shape), -1 * clip, clip)
-        ).astype(np.float32)
+        ts = ts + np.clip(np.random.normal(0, sigma, size=ts.shape), -1 * clip, clip)
 
     # Days normalizatioin to ref date
-    days = (dates - datetime(year=season - 1, month=start_month, day=1)).dt.days.values
+    days = [
+        (date.fromisoformat(d) - date(year=season - 1, month=start_month, day=1)).days
+        for d in dates
+    ]
 
     # GDD computation
     if temperatures is not None:
@@ -77,8 +78,8 @@ def ts_transforms(
     mask[:n_positions] = 1
 
     return (
-        ts_padded,
-        positions_padded,
-        days_padded,
-        mask,
+        ts_padded.astype(np.float32),
+        positions_padded.astype(np.int32),
+        days_padded.astype(np.int16),
+        mask.astype(np.uint8),
     )
