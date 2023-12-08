@@ -422,11 +422,15 @@ class SITSDataModule(L.LightningDataModule):
     def setup(self, stage: str):
         if stage == "fit":
             self.train_dataset = self.get_dataset("train", self.train_seasons)
-            self.val_dataset = self.get_dataset("val", self.train_seasons)
+            self.val_dataset = self.get_dataset("val", self.val_seasons)
 
     def train_dataloader(self):
-        return DataLoader(
+        ds_shuffled = ShufflerIterDataPipe(
             self.train_dataset,
+            buffer_size=100,
+        )
+        return DataLoader(
+            ds_shuffled,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             persistent_workers=True,

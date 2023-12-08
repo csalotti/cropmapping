@@ -78,24 +78,26 @@ class SITSDataset(IterableDataset):
         worker_info = torch.utils.data.get_worker_info()
         worker_id = worker_info.id
         num_workers = worker_info.num_workers
+        chunk_size = self.num_points//num_workers
 
         worker_poi_ids = list(self.labels.keys())[
-            (worker_id * num_workers) : min(
-                (worker_id + 1) * num_workers, self.num_points
+            (worker_id * chunk_size) : min(
+                (worker_id + 1) * chunk_size, self.num_points
             )
         ]
 
         for season in self.seasons:
             season_features_df = self.get_table(
-                self.features_file, worker_poi_ids[0], worker_poi_ids[-1], season
+                file=self.features_file, min_id=worker_poi_ids[0], max_id=worker_poi_ids[-1], season=season
             )
             season_features_df.columns = (
                 season_features_df.columns.str.strip().str.lower()
             )
             season_temperatures_df = self.get_table(
-                self.features_file, worker_poi_ids[0], worker_poi_ids[-1], season
+                self.temperatures_file, worker_poi_ids[0], worker_poi_ids[-1], season
             )
 
+            raise ValueError(season_features_df.values)
             for (feat_id, feat_df), (temp_id, temp_df) in zip(
                 season_features_df.groupby(POINT_ID_COL),
                 season_temperatures_df.groupby(POINT_ID_COL),
@@ -104,6 +106,9 @@ class SITSDataset(IterableDataset):
                     raise ValueError(
                         "temperatures and features don't match anymore {feat_id} != {temp_id}"
                     )
+
+                if season not in self.labels[feat_id]:
+                    continue
 
                 ts = feat_df[ALL_BANDS].values
                 dates = feat_df[DATE_COL].values
@@ -134,4 +139,4 @@ class SITSDataset(IterableDataset):
                     key: torch.from_numpy(value) for key, value in output.items()
                 }
 
-                return tensor_output
+                yield tensor_output
