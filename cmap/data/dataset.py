@@ -67,8 +67,8 @@ class SITSDataset(IterableDataset):
         return pd.read_parquet(
             file,
             filters=[
-                (POINT_ID_COL, "<=", min_id),
-                (POINT_ID_COL, ">=", max_id),
+                (POINT_ID_COL, "<=", max_id),
+                (POINT_ID_COL, ">=", min_id),
             ],
         )
 
@@ -105,6 +105,7 @@ class SITSDataset(IterableDataset):
             worker_poi_ids[0],
             worker_poi_ids[-1],
         )
+
 
         for (feat_poi_id, poi_features_df), (temp_poi_id, poi_temperatures_df) in zip(
             worker_features_df.groupby(POINT_ID_COL),
