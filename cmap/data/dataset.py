@@ -24,7 +24,6 @@ class SITSDataset(IterableDataset):
         features_file: str,
         labels: pd.DataFrame,
         classes: List[str],
-        seasons: List[int],
         temperatures_file: str,
         ref_year: int = 2023,
         start_month: int = 11,
@@ -37,7 +36,6 @@ class SITSDataset(IterableDataset):
         self.features_file = features_file
         self.temperatures_file = temperatures_file
         self.classes = {cn: i for i, cn in enumerate(classes)}
-        self.seasons = seasons
 
         # Labels
         self.labels = defaultdict(dict)
@@ -61,16 +59,23 @@ class SITSDataset(IterableDataset):
         self.augment = augment
 
     def get_table(
-        self, file: str, min_id: str, max_id: str, season: int
+        self,
+        file: str,
+        min_id: str,
+        max_id: str,
     ) -> pd.DataFrame:
         return pd.read_parquet(
             file,
             filters=[
                 (POINT_ID_COL, "<=", min_id),
                 (POINT_ID_COL, ">=", max_id),
-                (DATE_COL, ">=", f"{season - 1}-{self.start_month}-01"),
-                (DATE_COL, "<=", f"{season }-{self.end_month}-01"),
             ],
+        )
+
+    def filter_season(self, df: pd.DataFrame, season: int):
+        return df.query(
+            f"({DATE_COL} >= '{season - 1}-{self.start_month}-01')"
+            + f" & ({DATE_COL} <= '{season}-{self.end_month}-01')"
         )
 
     def __iter__(self):
@@ -78,42 +83,39 @@ class SITSDataset(IterableDataset):
         worker_info = torch.utils.data.get_worker_info()
         worker_id = worker_info.id
         num_workers = worker_info.num_workers
-        chunk_size = self.num_points//num_workers
+        chunk_size = self.num_points // num_workers
 
         worker_poi_ids = list(self.labels.keys())[
             (worker_id * chunk_size) : min(
                 (worker_id + 1) * chunk_size, self.num_points
             )
         ]
+        worker_features_df = self.get_table(
+            file=self.features_file,
+            min_id=worker_poi_ids[0],
+            max_id=worker_poi_ids[-1],
+        )
+        worker_features_df.columns = worker_features_df.columns.str.strip().str.lower()
+        worker_temperatures_df = self.get_table(
+            self.temperatures_file,
+            worker_poi_ids[0],
+            worker_poi_ids[-1],
+        )
 
-        for season in self.seasons:
-            season_features_df = self.get_table(
-                file=self.features_file, min_id=worker_poi_ids[0], max_id=worker_poi_ids[-1], season=season
-            )
-            season_features_df.columns = (
-                season_features_df.columns.str.strip().str.lower()
-            )
-            season_temperatures_df = self.get_table(
-                self.temperatures_file, worker_poi_ids[0], worker_poi_ids[-1], season
-            )
+        for (feat_poi_id, poi_features_df), (temp_poi_id, poi_temperatures_df) in zip(
+            worker_features_df.groupby(POINT_ID_COL),
+            worker_temperatures_df.groupby(POINT_ID_COL),
+        ):
+            if feat_poi_id != temp_poi_id:
+                raise ValueError(
+                    "temperatures and features don't match anymore {feat_id} != {temp_id}"
+                )
 
-            raise ValueError(season_features_df.values)
-            for (feat_id, feat_df), (temp_id, temp_df) in zip(
-                season_features_df.groupby(POINT_ID_COL),
-                season_temperatures_df.groupby(POINT_ID_COL),
-            ):
-                if feat_id != temp_id:
-                    raise ValueError(
-                        "temperatures and features don't match anymore {feat_id} != {temp_id}"
-                    )
-
-                if season not in self.labels[feat_id]:
-                    continue
-
-                ts = feat_df[ALL_BANDS].values
-                dates = feat_df[DATE_COL].values
-                temperatures = temp_df[TEMP_COL].values
-                label = self.labels[feat_id][season]
+            for season in self.labels[feat_poi_id].keys():
+                ts = poi_features_df[ALL_BANDS].values
+                dates = poi_features_df[DATE_COL].values
+                temperatures = poi_temperatures_df[TEMP_COL].values
+                label = self.labels[feat_poi_id][season]
 
                 ts, positions, days, mask = ts_transforms(
                     ts=ts,

@@ -413,7 +413,6 @@ class SITSDataModule(L.LightningDataModule):
         return SITSDataset(
             features_file=features_file,
             labels=labels,
-            seasons=seasons,
             classes=self.classes,
             temperatures_file=temperatures_file,
             augment=stage == "train",
