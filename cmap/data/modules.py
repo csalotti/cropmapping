@@ -411,10 +411,11 @@ class SITSDataModule(L.LightningDataModule):
         labels = labels_sample(labels, seasons=seasons, fraction=self.fraction)
 
         return SITSDataset(
-            features_file,
-            labels,
-            self.classes,
-            temperatures_file,
+            features_file=features_file,
+            labels=labels,
+            seasons=seasons,
+            classes=self.classes,
+            temperatures_file=temperatures_file,
             augment=stage == "train",
         )
 
