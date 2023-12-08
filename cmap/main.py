@@ -1,4 +1,5 @@
 import logging
+from multiprocessing import set_start_method
 
 import pytorch_lightning as L
 from pytorch_lightning.cli import LightningCLI
@@ -18,4 +19,5 @@ def cli_main():
 
 
 if __name__ == "__main__":
+    set_start_method("spawn")
     cli_main()

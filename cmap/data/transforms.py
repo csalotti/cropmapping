@@ -31,6 +31,8 @@ def ts_transforms(
 ) -> Tuple[
     NDArray[np.float32], NDArray[np.int32], NDArray[np.int32], NDArray[np.uint8]
 ]:
+
+    ts = ts.astype(np.float32)
     # Bands standardization
     if standardize:
         ts -= np.mean(ts, axis=0)

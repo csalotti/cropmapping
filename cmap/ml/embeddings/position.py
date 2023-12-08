@@ -27,4 +27,4 @@ class PositionalEncoding(nn.Module):
         self.encoding = nn.Embedding.from_pretrained(pe, freeze=True)
 
     def forward(self, positions):
-        return self.encoding(positions.int())  # [batch_size, seq_length, embed_dim]
+        return self.encoding(positions)  # [batch_size, seq_length, embed_dim]

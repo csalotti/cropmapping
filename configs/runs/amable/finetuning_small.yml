@@ -1,9 +1,9 @@
 trainer:
   callbacks: 
       class_path: pytorch_lightning.callbacks.LearningRateMonitor
-  max_epochs: 200
-  precision: 32
-  detect_anomaly: true
+  max_epochs: 1
+  precision: 16-mixed
+  profiler: simple
 data:
   class_path: cmap.data.modules.SITSDataModule
   init_args:
@@ -11,6 +11,7 @@ data:
     include_temperatures: true 
     num_workers: 16
     batch_size: 128
+    fraction: 0.10
     train_seasons:
       - 2019
       - 2020
@@ -35,7 +36,7 @@ model:
           init_args: 
             d_model: 256
             tau: 10000
-            max_len: 397
+            max_len: 10000
         bands_encoder:
           class_path: cmap.ml.embeddings.bands.PixelEncoding
           init_args:

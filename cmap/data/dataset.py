@@ -73,6 +73,11 @@ class SITSDataset(Dataset):
 
         season_features_df = self.get_season(self.features_file, poi_id, season)
         season_features_df.columns = season_features_df.columns.str.strip().str.lower()
+
+        if len(season_features_df) == 0:
+            raise ValueError(f"{poi_id}, {season}, {label} \n {season_features_df.values}")
+
+
         ts = season_features_df[ALL_BANDS].values
         dates = season_features_df[DATE_COL].values
         temperatures = None
