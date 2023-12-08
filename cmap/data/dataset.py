@@ -81,15 +81,19 @@ class SITSDataset(IterableDataset):
     def __iter__(self):
         # Workers infos
         worker_info = torch.utils.data.get_worker_info()
-        worker_id = worker_info.id
-        num_workers = worker_info.num_workers
-        chunk_size = self.num_points // num_workers
+        if worker_info is not None:
+            worker_id = worker_info.id
+            num_workers = worker_info.num_workers
+            chunk_size = self.num_points // num_workers
 
-        worker_poi_ids = list(self.labels.keys())[
-            (worker_id * chunk_size) : min(
-                (worker_id + 1) * chunk_size, self.num_points
-            )
-        ]
+            worker_poi_ids = list(self.labels.keys())[
+                (worker_id * chunk_size) : min(
+                    (worker_id + 1) * chunk_size, self.num_points
+                )
+            ]
+        else:
+            worker_poi_ids = list(self.labels.keys())
+
         worker_features_df = self.get_table(
             file=self.features_file,
             min_id=worker_poi_ids[0],
@@ -112,9 +116,12 @@ class SITSDataset(IterableDataset):
                 )
 
             for season in self.labels[feat_poi_id].keys():
-                ts = poi_features_df[ALL_BANDS].values
-                dates = poi_features_df[DATE_COL].values
-                temperatures = poi_temperatures_df[TEMP_COL].values
+                season_features_df = self.filter_season(poi_features_df, season)
+                season_temperatures_df = self.filter_season(poi_temperatures_df, season)
+
+                ts = season_features_df[ALL_BANDS].values
+                dates = season_features_df[DATE_COL].values
+                temperatures = season_temperatures_df[TEMP_COL].values
                 label = self.labels[feat_poi_id][season]
 
                 ts, positions, days, mask = ts_transforms(
