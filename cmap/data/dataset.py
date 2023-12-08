@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import datetime
 from typing import Dict, List, Optional, Union
+import torch
 from torch.utils.data import Dataset
 import pandas as pd
 import numpy as np
@@ -18,10 +19,10 @@ from cmap.utils.constants import (
 class SITSDataset(Dataset):
     def __init__(
         self,
-        features: pd.DataFrame,
+        features_file: str,
         labels: pd.DataFrame,
         classes: List[str],
-        temperatures: Optional[pd.DataFrame] = None,
+        temperatures_file: Optional[str] = None,
         ref_year: int = 2023,
         start_month: int = 11,
         end_month: int = 12,
@@ -30,11 +31,11 @@ class SITSDataset(Dataset):
         augment: bool = False,
     ):
         # Data
-        self.features = features
-        self.temperatures = temperatures
+        self.features_file = features_file
+        self.temperatures_file = temperatures_file
         self.classes = {cn: i for i, cn in enumerate(classes)}
 
-        # Labels  
+        # Labels
         self.labels = labels.to_dict(orient="records")
 
         # Dates and season norm
@@ -52,11 +53,14 @@ class SITSDataset(Dataset):
         self.standardize = standardize
         self.augment = augment
 
-    def filter_season(self, df: pd.DataFrame, poi_id: str, season: int) -> pd.DataFrame:
-        return df.query(
-            f"{POINT_ID_COL} == '{poi_id}'"
-            + f" & ({DATE_COL} >= '{season - 1}-{self.start_month}-01')"
-            + f" & ({DATE_COL} <= '{season}-{self.end_month}-01')"
+    def get_season(self, file: str, poi_id: str, season: int) -> pd.DataFrame:
+        return pd.read_parquet(
+            file,
+            filters=[
+                (POINT_ID_COL, "=", poi_id),
+                (DATE_COL, ">=", f"{season - 1}-{self.start_month}-01"),
+                (DATE_COL, "<=", f"{season }-{self.end_month}-01"),
+            ],
         )
 
     def __len__(self):
@@ -67,18 +71,16 @@ class SITSDataset(Dataset):
             self.labels[idx][k] for k in ["poi_id", "season", "label"]
         ]
 
-        season_features_df = self.filter_season(self.features, poi_id, season)
+        season_features_df = self.get_season(self.features_file, poi_id, season)
         season_features_df.columns = season_features_df.columns.str.strip().str.lower()
         ts = season_features_df[ALL_BANDS].values
         dates = season_features_df[DATE_COL]
         temperatures = None
 
         # Augment with temperatures
-        if self.temperatures is not None:
-            temperatures = self.temperatures.query(f"{POINT_ID_COL} == {poi_id}")
-            temperatures = self.filter_season(temperatures, poi_id, season)
+        if self.temperatures_file is not None:
+            temperatures = self.get_season(self.temperatures_file, poi_id, season)
             temperatures = temperatures[TEMP_COL].values
-
 
         ts, positions, days, mask = ts_transforms(
             ts=ts,
@@ -100,7 +102,6 @@ class SITSDataset(Dataset):
             "class": class_id,
         }
 
-        
         tensor_output = {key: torch.from_numpy(value) for key, value in output.items()}
 
         return tensor_output

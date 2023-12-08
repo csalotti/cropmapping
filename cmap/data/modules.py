@@ -397,23 +397,24 @@ class SITSDataModule(L.LightningDataModule):
 
     def get_dataset(self, stage: str, seasons: List[int]):
         # Gather
-        features = pd.read_csv(os.path.join(self.root, stage, "features.csv"), parse_dates=[DATE_COL], engine="pyarrow")
-        temperatures = (
-            pd.read_csv(os.path.join(self.root, stage, "temperatures.csv"), parse_dates=[DATE_COL], engine="pyarrow")
+        features_file = join(self.root, stage, "features.parquet")
+        temperatures_file = (
+            join(self.root, stage, "temperatures.parquet")
             if self.include_temperatures
             else None
         )
-        labels = pd.read_csv(os.path.join(self.root, stage, "labels.csv"), engine="pyarrow")
+        labels = pd.read_csv(
+            os.path.join(self.root, stage, "labels.csv"), engine="pyarrow"
+        )
 
         # Filter
         labels = labels_sample(labels, seasons=seasons, fraction=self.fraction)
-        features = features[features[POINT_ID_COL].isin(labels[POINT_ID_COL])]
 
         return SITSDataset(
-            features,
+            features_file,
             labels,
             self.classes,
-            temperatures,
+            temperatures_file,
             augment=stage == "train",
         )
 
