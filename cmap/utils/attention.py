@@ -59,7 +59,7 @@ def resample(attention_map, days, masks, targets, ref_month=11, ref_year=2023):
             - 12
         )
         if df["month"].min() <= 0:
-            df["month"] += abs(df["month"].min()) + 1
+            df["month"] += abs(df["month"].min())
 
         df_month = (
             df[["month", "layer", "map_value"]]
@@ -85,18 +85,17 @@ def plot_attention(attn_maps_df, step_name: str, post_title: str = ""):
 
         values_norm = np.zeros(14)
         values_norm[steps] = values
-        values_norm = values_norm[1:]
 
         # Plot line
         g = sns.lineplot(
-            x=range(1, 14),
+            x=range(14),
             y=values_norm,
             label=layer,
             ax=ax,
         )
 
         # Fill the area under the line
-        plt.fill_between(range(1, 14), 0, values_norm, alpha=0.2)
+        plt.fill_between(range(14), 0, values_norm, alpha=0.2)
 
     g.set(title=f"Average Attention Map {post_title}", ylim=(0, 1))
     plt.legend(loc="upper left", bbox_to_anchor=(1, 1), title="Layers")

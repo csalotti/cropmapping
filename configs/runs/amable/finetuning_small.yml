@@ -1,15 +1,16 @@
 trainer:
   callbacks: 
       class_path: pytorch_lightning.callbacks.LearningRateMonitor
-  max_epochs: 100
-  precision: 16-mixed
+  max_epochs: 200
+  precision: 32
+  detect_anomaly: true
 data:
   class_path: cmap.data.modules.SITSDataModule
   init_args:
     root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/small
     include_temperatures: true 
-    num_workers: 1
-    batch_size: 128
+    num_workers: 4
+    batch_size: 512
     train_seasons:
       - 2019
       - 2020

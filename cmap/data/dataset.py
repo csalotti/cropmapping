@@ -28,7 +28,7 @@ class SITSDataset(IterableDataset):
         ref_year: int = 2023,
         start_month: int = 11,
         end_month: int = 12,
-        n_steps: int = 3,
+        n_steps: int = 5,
         standardize: bool = False,
         augment: bool = False,
     ):
@@ -61,16 +61,18 @@ class SITSDataset(IterableDataset):
     def get_table(
         self,
         file: str,
-        min_id: str,
-        max_id: str,
+        ids: List[str]
     ) -> pd.DataFrame:
-        return pd.read_parquet(
+        df =  pd.read_parquet(
             file,
             filters=[
-                (POINT_ID_COL, "<=", max_id),
-                (POINT_ID_COL, ">=", min_id),
+                (POINT_ID_COL, "in", ids),
             ],
         )
+        if DATE_COL in df.columns:
+            df[DATE_COL] = pd.to_datetime(df[DATE_COL])
+
+        return df
 
     def filter_season(self, df: pd.DataFrame, season: int):
         return df.query(
@@ -96,33 +98,38 @@ class SITSDataset(IterableDataset):
 
         worker_features_df = self.get_table(
             file=self.features_file,
-            min_id=worker_poi_ids[0],
-            max_id=worker_poi_ids[-1],
+            ids=worker_poi_ids,
         )
+        
         worker_features_df.columns = worker_features_df.columns.str.strip().str.lower()
-        worker_temperatures_df = self.get_table(
-            self.temperatures_file,
-            worker_poi_ids[0],
-            worker_poi_ids[-1],
-        )
+        #worker_temperatures_df = self.get_table(
+        #    self.temperatures_file,
+        #    ids=worker_poi_ids,
+        #)
 
+        for (feat_poi_id, poi_features_df) in worker_features_df.groupby(POINT_ID_COL):
 
-        for (feat_poi_id, poi_features_df), (temp_poi_id, poi_temperatures_df) in zip(
-            worker_features_df.groupby(POINT_ID_COL),
-            worker_temperatures_df.groupby(POINT_ID_COL),
-        ):
-            if feat_poi_id != temp_poi_id:
-                raise ValueError(
-                    "temperatures and features don't match anymore {feat_id} != {temp_id}"
-                )
+        #for (feat_poi_id, poi_features_df), (temp_poi_id, poi_temperatures_df) in zip(
+        #    worker_features_df.groupby(POINT_ID_COL),
+        #    worker_temperatures_df.groupby(POINT_ID_COL),
+        #):
+        #    if feat_poi_id != temp_poi_id:
+        #        raise ValueError(
+        #            "temperatures and features don't match anymore {feat_id} != {temp_id}"
+        #        )
 
             for season in self.labels[feat_poi_id].keys():
                 season_features_df = self.filter_season(poi_features_df, season)
-                season_temperatures_df = self.filter_season(poi_temperatures_df, season)
+
+                if len(season_features_df) < 5:
+                    continue
+
+                #season_temperatures_df = self.filter_season(poi_temperatures_df, season)
 
                 ts = season_features_df[ALL_BANDS].values
                 dates = season_features_df[DATE_COL].values
-                temperatures = season_temperatures_df[TEMP_COL].values
+                #temperatures = season_temperatures_df[TEMP_COL].values
+                temperatures=None
                 label = self.labels[feat_poi_id][season]
 
                 ts, positions, days, mask = ts_transforms(
