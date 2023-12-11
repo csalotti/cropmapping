@@ -61,9 +61,11 @@ class SITSDataset(IterableDataset):
         self.augment = augment
 
     def get_table(self, file: str, poi_ids: List[str]):
-        return pd.read_parquet(
-            open(file, "rb"), filters=[(POINT_ID_COL, "in", poi_ids)]
-        )
+        with open(file, "rb") as f:
+            df = pd.read_parquet(
+                open(file, "rb"), filters=[(POINT_ID_COL, "in", poi_ids)]
+            )
+        return df
 
     def filter_season(self, df: pd.DataFrame, season: int):
         return df.query(
@@ -89,17 +91,18 @@ class SITSDataset(IterableDataset):
 
         worker_features_df = self.get_table(self.features_file, worker_poi_ids)
         worker_features_df.columns = worker_features_df.columns.str.strip().str.lower()
-        # worker_temperatures_df = self.get_table(self.temperatures_file, worker_poi_ids)
+        worker_temperatures_df = self.get_table(self.temperatures_file, worker_poi_ids)
 
-        for feat_poi_id, poi_features_df in worker_features_df.groupby(POINT_ID_COL):
-            # for (feat_poi_id, poi_features_df), (temp_poi_id, poi_temperatures_df) in zip(
-            #    worker_features_df.groupby(POINT_ID_COL),
-            #    worker_temperatures_df.groupby(POINT_ID_COL),
-            # ):
-            #    if feat_poi_id != temp_poi_id:
-            #        raise ValueError(
-            #            "temperatures and features don't match anymore {feat_id} != {temp_id}"
-            #        )
+
+        for (feat_poi_id, poi_features_df), (temp_poi_id, poi_temperatures_df) in zip(
+                worker_features_df.groupby(POINT_ID_COL),
+                worker_temperatures_df.groupby(POINT_ID_COL),
+                ):
+        
+            if feat_poi_id != temp_poi_id:
+                raise ValueError(
+                    "temperatures and features don't match anymore {feat_id} != {temp_id}"
+                )
 
             for season in self.labels[feat_poi_id].keys():
                 season_features_df = self.filter_season(poi_features_df, season)
@@ -107,12 +110,11 @@ class SITSDataset(IterableDataset):
                 if len(season_features_df) < 5:
                     continue
 
-                # season_temperatures_df = self.filter_season(poi_temperatures_df, season)
+                season_temperatures_df = self.filter_season(poi_temperatures_df, season)
 
                 ts = season_features_df[ALL_BANDS].values
                 dates = season_features_df[DATE_COL].values
-                # temperatures = season_temperatures_df[TEMP_COL].values
-                temperatures = None
+                temperatures = season_temperatures_df[TEMP_COL].values
                 label = self.labels[feat_poi_id][season]
 
                 ts, positions, days, mask = ts_transforms(

@@ -3,7 +3,6 @@ trainer:
       class_path: pytorch_lightning.callbacks.LearningRateMonitor
   max_epochs: 200
   precision: 32
-  detect_anomaly: true
 data:
   class_path: cmap.data.modules.SITSDataModule
   init_args:
