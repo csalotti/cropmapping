@@ -1,12 +1,9 @@
 import logging
-from typing import List
 
-from torch import Tensor, dropout, nn
+from torch import Tensor, nn
 import torch
 
-from cmap.ml.embeddings.bands import PatchBandsEncoding
-from cmap.ml.embeddings.position import PositionalEncoding
-from cmap.utils.attention import SaveAttentionMapHook, patch_attention
+from cmap.utils.attention import SaveAttentionMapHook
 
 logger = logging.getLogger("cmap.ml.encoders")
 
@@ -63,7 +60,7 @@ class TransformerEncoder(nn.Module):
 
     def forward(self, ts: Tensor, positions: Tensor, mask: Tensor):
         mask = mask == 0
-        
+
         x_position_emb = self.position_encoder(positions)
         x_bands_emb = self.bands_encoder(ts)
 
@@ -77,31 +74,13 @@ class TransformerEncoder(nn.Module):
         return x_trans
 
 
-class SITSFormer(TransformerEncoder):
+class ExchangerEncoder(nn.Module):
     def __init__(
         self,
-        max_n_days: int = 397,
-        d_model: int = 256,
-        band_emb_chanels: List[int] = [32, 64],
-        band_emb_kernel_size: List[int] = [5, 5],
-        n_att_head: int = 8,
-        n_att_layers: int = 3,
-        dropout_p: float = 0.1,
-    ):
-        position_encoder = PositionalEncoding(
-            d_model=d_model,
-            max_len=max_n_days,
-        )
-        bands_encoder = PatchBandsEncoding(
-            channel_size=band_emb_chanels + [d_model],
-            kernel_sizes=band_emb_kernel_size,
-        )
+        position_encoder: nn.Module,
+        bands_encoder: nn.Module,
+    ) -> None:
+        super().__init__()
 
-        super().__init__(
-            position_encoder,
-            bands_encoder,
-            d_model,
-            n_att_head,
-            n_att_layers,
-            dropout_p,
-        )
+        self.position_encoder = position_encoder
+        self.bands_encoder = bands_encoder

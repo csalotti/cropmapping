@@ -1,8 +1,8 @@
 from collections import defaultdict
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 import torch
-from torch.utils.data import Dataset, IterableDataset
+from torch.utils.data import IterableDataset
 import pandas as pd
 import numpy as np
 from cmap.data.transforms import ts_transforms
@@ -14,7 +14,6 @@ from cmap.utils.constants import (
     LABEL_COL,
     POINT_ID_COL,
     SEASON_COL,
-    TEMP_COL,
 )
 
 
@@ -24,7 +23,7 @@ class SITSDataset(IterableDataset):
         features_file: str,
         labels: pd.DataFrame,
         classes: List[str],
-        temperatures_file: Optional[str],
+        extra_features_files: Dict[str, str],
         ref_year: int = 2023,
         start_month: int = 11,
         end_month: int = 12,
@@ -34,7 +33,7 @@ class SITSDataset(IterableDataset):
     ):
         # Data
         self.features_file = features_file
-        self.temperatures_file = temperatures_file
+        self.extra_features_files = extra_features_files
         self.classes = {cn: i for i, cn in enumerate(classes)}
 
         # Labels
@@ -91,41 +90,55 @@ class SITSDataset(IterableDataset):
 
         worker_features_df = self.get_table(self.features_file, worker_poi_ids)
         worker_features_df.columns = worker_features_df.columns.str.strip().str.lower()
-        worker_temperatures_df = self.get_table(self.temperatures_file, worker_poi_ids)
+        iterator = [worker_features_df.groupby(POINT_ID_COL)]
+        extra_features_name = []
+        for extra_id, extra_file in self.extra_features_files:
+            extra_features_name.append(extra_id)
+            worker_extra_df = self.get_table(extra_file, worker_poi_ids)
+            iterator.append(worker_extra_df.groupby(POINT_ID_COL))
 
+        # for (feat_poi_id, poi_features_df), (temp_poi_id, poi_temperatures_df) in zip(
+        #     worker_features_df.groupby(POINT_ID_COL),
+        #     worker_temperatures_df.groupby(POINT_ID_COL),
+        # ):
+        iterator = zip(*iterator) if len(extra_features_name) > 0 else iterator
 
-        for (feat_poi_id, poi_features_df), (temp_poi_id, poi_temperatures_df) in zip(
-                worker_features_df.groupby(POINT_ID_COL),
-                worker_temperatures_df.groupby(POINT_ID_COL),
-                ):
-        
-            if feat_poi_id != temp_poi_id:
-                raise ValueError(
-                    "temperatures and features don't match anymore {feat_id} != {temp_id}"
-                )
+        for group_features in iterator:
+            poi_id, features_df = (
+                group_features if len(extra_features_name) == 0 else group_features[0]
+            )
 
-            for season in self.labels[feat_poi_id].keys():
-                season_features_df = self.filter_season(poi_features_df, season)
+            for season in self.labels[poi_id].keys():
+                season_features_df = self.filter_season(features_df, season)
 
                 if len(season_features_df) < 5:
                     continue
 
-                season_temperatures_df = self.filter_season(poi_temperatures_df, season)
+                extra_features_df = {}
+
+                for i, extra_name in enumerate(extra_features_name):
+                    if group_features[i + 1][0] != poi_id:
+                        ValueError(
+                            f"{extra_name} and features don't match {group_features[i+1][0]} != {poi_id}"
+                        )
+
+                    extra_features_df[extra_name] = self.filter_season(
+                        group_features[i + 1][1], season
+                    )
 
                 ts = season_features_df[ALL_BANDS].values
                 dates = season_features_df[DATE_COL].values
-                temperatures = season_temperatures_df[TEMP_COL].values
                 label = self.labels[feat_poi_id][season]
 
                 ts, positions, days, mask = ts_transforms(
                     ts=ts,
                     dates=dates,
-                    temperatures=temperatures,
                     season=season,
                     start_month=self.start_month,
                     max_n_positions=self.max_n_positions,
                     standardize=self.standardize,
                     augment=self.augment,
+                    **extra_features_df,
                 )
 
                 class_id = np.array([self.classes[label]])

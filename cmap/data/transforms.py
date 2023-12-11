@@ -23,7 +23,7 @@ def ts_transforms(
     ts: NDArray,
     dates: pd.Series,
     season: int,
-    temperatures: Optional[NDArray],
+    temperatures: Optional[NDArray] = None,
     start_month: int = 11,
     max_n_positions: int = 397,
     standardize: bool = False,
