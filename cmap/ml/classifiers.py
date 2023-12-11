@@ -12,7 +12,6 @@ from torch.optim.lr_scheduler import ExponentialLR, LinearLR, SequentialLR
 from torchmetrics.classification import MulticlassConfusionMatrix, MulticlassF1Score
 
 
-from cmap.ml.losses import FocalLoss
 from cmap.utils.attention import patch_attention, plot_attention, resample, merge
 from cmap.utils.distributions import get_dist_plot
 
@@ -49,7 +48,11 @@ class Classifier(L.LightningModule):
         # labels
         self.classes = classes
         self.n_classes = len(classes)
-        self.classes_weights = torch.FloatTensor([class_weights[c] for c in classes]) if (class_weights is not None) else None
+        self.classes_weights = (
+            torch.FloatTensor([class_weights[c] for c in classes])
+            if (class_weights is not None)
+            else None
+        )
 
         # Optimizationin
         self.min_lr = min_lr
@@ -90,7 +93,7 @@ class Classifier(L.LightningModule):
         ts, positions, mask, y = [
             batch[k] for k in ["ts", "positions", "mask", "class"]
         ]
-        
+
         # Infer
         ts_encoded = self.encoder(ts=ts, positions=positions, mask=mask)
         y_hat = self.decoder(x=ts_encoded, mask=mask)
@@ -101,7 +104,7 @@ class Classifier(L.LightningModule):
 
         # Metrics
         loss = self.criterion(y_hat, y)
-        f1_score = self.train_f1.update(y_hat_cls, y)
+        self.train_f1.update(y_hat_cls, y)
         self.train_conf_mat.update(y_hat, y)
 
         # Logging
@@ -176,7 +179,7 @@ class Classifier(L.LightningModule):
 
         # Metrics
         loss = self.criterion(y_hat, y)
-        f1_score = self.val_f1.update(y_hat_cls, y)
+        self.val_f1.update(y_hat_cls, y)
 
         self.log(
             "Losses/val",
@@ -246,7 +249,9 @@ class Classifier(L.LightningModule):
                 class_attn_maps_df = batch_attn_maps_df.query(f"target == {i}")
                 if len(class_attn_maps_df) > 0:
                     attn_fig = plot_attention(
-                         class_attn_maps_df, "month", ci,
+                        class_attn_maps_df,
+                        "month",
+                        ci,
                     )
 
                     self.logger.experiment.add_figure(

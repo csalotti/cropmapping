@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from datetime import date
 from numpy.typing import NDArray
 
@@ -23,7 +23,7 @@ def ts_transforms(
     ts: NDArray,
     dates: pd.Series,
     season: int,
-    temperatures: NDArray,
+    temperatures: Optional[NDArray],
     start_month: int = 11,
     max_n_positions: int = 397,
     standardize: bool = False,
@@ -31,7 +31,6 @@ def ts_transforms(
 ) -> Tuple[
     NDArray[np.float32], NDArray[np.int32], NDArray[np.int32], NDArray[np.uint8]
 ]:
-
     ts = ts.astype(np.float32)
     # Bands standardization
     if standardize:

@@ -21,10 +21,10 @@ from cmap.utils.constants import (
 class SITSDataset(IterableDataset):
     def __init__(
         self,
-        features_file: str,
+        features_df: pd.DataFrame,
         labels: pd.DataFrame,
         classes: List[str],
-        temperatures_file: str,
+        temperatures_df: Optional[pd.DataFrame],
         ref_year: int = 2023,
         start_month: int = 11,
         end_month: int = 12,
@@ -33,14 +33,16 @@ class SITSDataset(IterableDataset):
         augment: bool = False,
     ):
         # Data
-        self.features_file = features_file
-        self.temperatures_file = temperatures_file
+        self.features_df = features_df
+        self.temperatures_df = temperatures_df
         self.classes = {cn: i for i, cn in enumerate(classes)}
 
         # Labels
         self.labels = defaultdict(dict)
-        for l in labels.to_dict("records"):
-            self.labels[l[POINT_ID_COL]][l[SEASON_COL]] = l[LABEL_COL]
+        for poi_id, season, label in labels[
+            [POINT_ID_COL, SEASON_COL, LABEL_COL]
+        ].values:
+            self.labels[poi_id][season] = label
         self.num_points = len(self.labels.keys())
 
         # Dates and season norm
@@ -58,26 +60,10 @@ class SITSDataset(IterableDataset):
         self.standardize = standardize
         self.augment = augment
 
-    def get_table(
-        self,
-        file: str,
-        ids: List[str]
-    ) -> pd.DataFrame:
-        df =  pd.read_parquet(
-            file,
-            filters=[
-                (POINT_ID_COL, "in", ids),
-            ],
-        )
-        if DATE_COL in df.columns:
-            df[DATE_COL] = pd.to_datetime(df[DATE_COL])
-
-        return df
-
     def filter_season(self, df: pd.DataFrame, season: int):
         return df.query(
             f"({DATE_COL} >= '{season - 1}-{self.start_month}-01')"
-            + f" & ({DATE_COL} <= '{season}-{self.end_month}-01')"
+            + f" & ({DATE_COL} < '{season}-{self.end_month}-01')"
         )
 
     def __iter__(self):
@@ -96,40 +82,37 @@ class SITSDataset(IterableDataset):
         else:
             worker_poi_ids = list(self.labels.keys())
 
-        worker_features_df = self.get_table(
-            file=self.features_file,
-            ids=worker_poi_ids,
+        worker_features_df = self.features_df.query(
+            f"{POINT_ID_COL} in @worker_poi_ids"
         )
-        
         worker_features_df.columns = worker_features_df.columns.str.strip().str.lower()
-        #worker_temperatures_df = self.get_table(
-        #    self.temperatures_file,
-        #    ids=worker_poi_ids,
-        #)
+        # worker_temperatures_df = self.temperatures_df.query(
+        #     f"{POINT_ID_COL} in @worker_poi_ids"
+        # )
 
-        for (feat_poi_id, poi_features_df) in worker_features_df.groupby(POINT_ID_COL):
-
-        #for (feat_poi_id, poi_features_df), (temp_poi_id, poi_temperatures_df) in zip(
-        #    worker_features_df.groupby(POINT_ID_COL),
-        #    worker_temperatures_df.groupby(POINT_ID_COL),
-        #):
-        #    if feat_poi_id != temp_poi_id:
-        #        raise ValueError(
-        #            "temperatures and features don't match anymore {feat_id} != {temp_id}"
-        #        )
+        for feat_poi_id, poi_features_df in worker_features_df.groupby(POINT_ID_COL):
+            # for (feat_poi_id, poi_features_df), (temp_poi_id, poi_temperatures_df) in zip(
+            #    worker_features_df.groupby(POINT_ID_COL),
+            #    worker_temperatures_df.groupby(POINT_ID_COL),
+            # ):
+            #    if feat_poi_id != temp_poi_id:
+            #        raise ValueError(
+            #            "temperatures and features don't match anymore {feat_id} != {temp_id}"
+            #        )
 
             for season in self.labels[feat_poi_id].keys():
                 season_features_df = self.filter_season(poi_features_df, season)
 
                 if len(season_features_df) < 5:
+                    raise ValueError(season_features_df.values)
                     continue
 
-                #season_temperatures_df = self.filter_season(poi_temperatures_df, season)
+                # season_temperatures_df = self.filter_season(poi_temperatures_df, season)
 
                 ts = season_features_df[ALL_BANDS].values
                 dates = season_features_df[DATE_COL].values
-                #temperatures = season_temperatures_df[TEMP_COL].values
-                temperatures=None
+                # temperatures = season_temperatures_df[TEMP_COL].values
+                temperatures = None
                 label = self.labels[feat_poi_id][season]
 
                 ts, positions, days, mask = ts_transforms(

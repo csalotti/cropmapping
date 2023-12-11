@@ -403,6 +403,10 @@ class SITSDataModule(L.LightningDataModule):
             if self.include_temperatures
             else None
         )
+        features_df = pd.read_parquet(features_file)
+        temperatures_df = (
+            pd.read_parquet(temperatures_file) if temperatures_file else None
+        )
         labels = pd.read_csv(
             os.path.join(self.root, stage, "labels.csv"), engine="pyarrow"
         )
@@ -411,10 +415,10 @@ class SITSDataModule(L.LightningDataModule):
         labels = labels_sample(labels, seasons=seasons, fraction=self.fraction)
 
         return SITSDataset(
-            features_file=features_file,
+            features_df=features_df,
             labels=labels,
             classes=self.classes,
-            temperatures_file=temperatures_file,
+            temperatures_df=temperatures_df,
             augment=stage == "train",
         )
 
