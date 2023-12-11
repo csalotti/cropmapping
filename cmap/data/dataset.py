@@ -21,10 +21,10 @@ from cmap.utils.constants import (
 class SITSDataset(IterableDataset):
     def __init__(
         self,
-        features_df: pd.DataFrame,
+        features_file: str,
         labels: pd.DataFrame,
         classes: List[str],
-        temperatures_df: Optional[pd.DataFrame],
+        temperatures_file: Optional[str],
         ref_year: int = 2023,
         start_month: int = 11,
         end_month: int = 12,
@@ -33,8 +33,8 @@ class SITSDataset(IterableDataset):
         augment: bool = False,
     ):
         # Data
-        self.features_df = features_df
-        self.temperatures_df = temperatures_df
+        self.features_file = features_file
+        self.temperatures_file = temperatures_file
         self.classes = {cn: i for i, cn in enumerate(classes)}
 
         # Labels
@@ -60,6 +60,11 @@ class SITSDataset(IterableDataset):
         self.standardize = standardize
         self.augment = augment
 
+    def get_table(self, file: str, poi_ids: List[str]):
+        return pd.read_parquet(
+            open(file, "rb"), filters=[(POINT_ID_COL, "in", poi_ids)]
+        )
+
     def filter_season(self, df: pd.DataFrame, season: int):
         return df.query(
             f"({DATE_COL} >= '{season - 1}-{self.start_month}-01')"
@@ -82,13 +87,9 @@ class SITSDataset(IterableDataset):
         else:
             worker_poi_ids = list(self.labels.keys())
 
-        worker_features_df = self.features_df.query(
-            f"{POINT_ID_COL} in @worker_poi_ids"
-        )
+        worker_features_df = self.get_table(self.features_file, worker_poi_ids)
         worker_features_df.columns = worker_features_df.columns.str.strip().str.lower()
-        # worker_temperatures_df = self.temperatures_df.query(
-        #     f"{POINT_ID_COL} in @worker_poi_ids"
-        # )
+        # worker_temperatures_df = self.get_table(self.temperatures_file, worker_poi_ids)
 
         for feat_poi_id, poi_features_df in worker_features_df.groupby(POINT_ID_COL):
             # for (feat_poi_id, poi_features_df), (temp_poi_id, poi_temperatures_df) in zip(
@@ -104,7 +105,6 @@ class SITSDataset(IterableDataset):
                 season_features_df = self.filter_season(poi_features_df, season)
 
                 if len(season_features_df) < 5:
-                    raise ValueError(season_features_df.values)
                     continue
 
                 # season_temperatures_df = self.filter_season(poi_temperatures_df, season)
