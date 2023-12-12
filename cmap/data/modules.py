@@ -19,7 +19,34 @@ logger = logging.getLogger("cmap.data.module")
 
 
 class SITSDataModule(L.LightningDataModule):
-    """ """
+    """Satelite Image Time Seriess Data module
+
+    Handles data preparation, preprocessing and create corresponding
+    Dataset and DataLoader.
+    All preprocessing is detailed to prepare and feed data to the model
+    It supposed that the data is in a folder with the following structure
+
+        root
+         ├── train
+         │    ├── features.pq
+         │    ├── labels.pq
+         │    └── <other_features>.pq
+         └── val
+              ├── features.pq
+              ├── labels.pq
+              └── <other_features>.pq
+
+    Attributes:
+        root (str): Data root
+        classes (List[str) : Expected classes
+        train_seasons (List[int]) : Training seasons
+        val_seasons (List[int] : Validation seasons
+        extra_features (Dict[str, Dict[str, str]]) : Extra Feature
+        rpg_mapping (str)=  RPG CODE to label mapping
+        fraction (float) : Dataset sampling fraction
+        batch_size (int) : Batch size
+        num_workers (int) : Number of parallell Dataloader workers
+    """
 
     def __init__(
         self,
@@ -32,7 +59,6 @@ class SITSDataModule(L.LightningDataModule):
         fraction: float = 1.0,
         batch_size: int = 32,
         num_workers: int = 3,
-        chunk_size: int = 10,
     ):
         L.LightningDataModule.__init__(self)
 
@@ -47,7 +73,6 @@ class SITSDataModule(L.LightningDataModule):
         # Hyperparams
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.chunk_size = chunk_size
 
         # Subsampling
         self.fraction = fraction

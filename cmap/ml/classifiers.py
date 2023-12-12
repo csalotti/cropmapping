@@ -34,7 +34,7 @@ class Classifier(L.LightningModule):
         self,
         encoder: nn.Module,
         decoder: nn.Module,
-        class_weights: Optional[Dict[str, float]] = None,
+        classes_weights: Optional[Dict[str, float]] = None,
         encoder_weights_path: str = "",
         classes: List[str] = DEFAULT_CLASSES,
         min_lr: float = 1e-6,
@@ -49,8 +49,8 @@ class Classifier(L.LightningModule):
         self.classes = classes
         self.n_classes = len(classes)
         self.classes_weights = (
-            torch.FloatTensor([class_weights[c] for c in classes])
-            if (class_weights is not None)
+            torch.FloatTensor([classes_weight[c] for c in classes])
+            if (classes_weights is not None)
             else None
         )
 

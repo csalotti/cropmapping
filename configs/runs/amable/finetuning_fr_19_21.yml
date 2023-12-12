@@ -55,3 +55,11 @@ model:
         num_classes : 7
     min_lr : 0.00001
     max_lr : 0.0001
+    classes_weights:
+      other : 0.52
+      ble_tendre : 0.52
+      mais : 0.66
+      orge : 1.12
+      colza : 2.64
+      tournesol : 3.25
+      ble_dur : 13.00
