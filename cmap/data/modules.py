@@ -387,14 +387,7 @@ class SITSDataModule(L.LightningDataModule):
         self.train_seasons = train_seasons
         self.val_seasons = val_seasons
         self.include_temperatures = include_temperatures
-        self.rpg_mapping = (
-            yaml.safe_load(open(rpg_mapping, "r")) if rpg_mapping else None
-        )
-        self.rpg_mapping = (
-            {ri: ci for ci, rpgs in self.rpg_mapping.items() for ri in rpgs}
-            if self.rpg_mapping is not None
-            else None
-        )
+        self.rpg_mapping = rpg_mapping
 
         # Hyperparams
         self.batch_size = batch_size
@@ -415,10 +408,10 @@ class SITSDataModule(L.LightningDataModule):
         labels = pd.read_parquet(os.path.join(self.root, stage, "labels.pq"))
 
         # Filter
-        labels = labels_sample(labels, seasons=seasons, fraction=self.fraction)
         if self.rpg_mapping is not None:
-            labels[LABEL_COL].map(self.rpg_mapping)
-
+            labels[LABEL_COL] = labels[LABEL_COL].map(lambda x : self.rpg_mapping.get(x, "other"))
+        labels = labels_sample(labels, seasons=seasons, fraction=self.fraction)
+        
         return SITSDataset(
             features_file=features_file,
             labels=labels,
@@ -428,6 +421,14 @@ class SITSDataModule(L.LightningDataModule):
 
     def setup(self, stage: str):
         if stage == "fit":
+            if self.rpg_mapping : 
+                self.rpg_mapping = yaml.safe_load(open(self.rpg_mapping, "r"))
+                self.rpg_mapping = {
+                        ri: ci 
+                        for ci, rpgs in self.rpg_mapping.items() 
+                        for ri in rpgs
+                }
+
             self.train_dataset = self.get_dataset("train", self.train_seasons)
             self.val_dataset = self.get_dataset("val", self.val_seasons)
 
