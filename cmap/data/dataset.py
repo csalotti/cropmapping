@@ -51,7 +51,7 @@ class SITSDataset(IterableDataset):
         ref_year: int = 2023,
         start_month: int = 11,
         end_month: int = 12,
-        n_steps: int = 5,
+        n_steps: int = 3,
         standardize: bool = False,
         augment: bool = False,
     ):

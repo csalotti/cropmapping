@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict
+from typing import List
 
 import pandas as pd
 import pytorch_lightning as L
@@ -41,8 +41,8 @@ class SITSDataModule(L.LightningDataModule):
         classes (List[str) : Expected classes
         train_seasons (List[int]) : Training seasons
         val_seasons (List[int] : Validation seasons
-        extra_features (Dict[str, Dict[str, str]]) : Extra Feature
-        rpg_mapping (str)=  RPG CODE to label mapping
+        extra_features (List[str]) : Extra Features
+        rpg_mapping (Dict[str, str])=  RPG CODE to label mapping
         fraction (float) : Dataset sampling fraction
         batch_size (int) : Batch size
         num_workers (int) : Number of parallell Dataloader workers
@@ -54,12 +54,24 @@ class SITSDataModule(L.LightningDataModule):
         classes: List[str],
         train_seasons: List[int] = [2017, 2018, 2019, 2020],
         val_seasons: List[int] = [2021],
-        extra_features: Dict[str, Dict[str, str]] = {},
+        extra_features: List[str] = [],
         rpg_mapping: str = "",
         fraction: float = 1.0,
         batch_size: int = 32,
         num_workers: int = 3,
     ):
+        """Initialize Lightning Data Module for SITS
+        Args:
+            root (str): Data root
+            classes (List[str) : Expected classes
+            train_seasons (List[int]) : Training seasons
+            val_seasons (List[int] : Validation seasons
+            extra_features (List[str]) : Extra Features
+            rpg_mapping (str) = path to mapping yaml
+            fraction (float) : Dataset sampling fraction
+            batch_size (int) : Batch size
+            num_workers (int) : Number of parallell Dataloader workers
+        """
         L.LightningDataModule.__init__(self)
 
         # Data
@@ -78,11 +90,23 @@ class SITSDataModule(L.LightningDataModule):
         self.fraction = fraction
 
     def get_dataset(self, stage: str, seasons: List[int]):
+        """Retrieve features and label with respect to stage
+        to createe the dataset. RPG codes are mapped to ttheir
+        label if provided, then filtered and sampled
+
+        Args :
+            stage (str) : Stage name (train or val)
+            seasons (List[int]) : Focused seasons
+
+        Returns:
+            SITSDataset for the respective stage and seeasons
+                with the provided features
+        """
         # Gather
         features_file = os.path.join(self.root, stage, "features.pq")
         labels = pd.read_parquet(os.path.join(self.root, stage, "labels.pq"))
         extra_features_files = {
-            fn: self.extra_features[fn][stage] for fn in self.extra_features.keys()
+            fn: os.path.join(self.root, stage, f"{fn}.pq") for fn in self.extra_features
         }
 
         # Filter
@@ -103,6 +127,13 @@ class SITSDataModule(L.LightningDataModule):
         )
 
     def setup(self, stage: str):
+        """Data preparation and preprocessing. RPG mmapping is
+        generateed if provideed and datasets are created.
+
+        Args:
+            stage (str) :Pytorch Lightning stage name (fit, predict, test)
+
+        """
         if stage == "fit":
             if self.rpg_mapping:
                 self.rpg_mapping = yaml.safe_load(open(self.rpg_mapping, "r"))
@@ -114,6 +145,7 @@ class SITSDataModule(L.LightningDataModule):
             self.val_dataset = self.get_dataset("val", self.val_seasons)
 
     def train_dataloader(self):
+        """Train Data Loader creation"""
         ds_shuffled = ShufflerIterDataPipe(
             self.train_dataset,
             buffer_size=100,
@@ -129,6 +161,7 @@ class SITSDataModule(L.LightningDataModule):
         )
 
     def val_dataloader(self):
+        """Validation Data Loader creation"""
         return DataLoader(
             self.val_dataset,
             batch_size=self.batch_size,
