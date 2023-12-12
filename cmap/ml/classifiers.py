@@ -49,7 +49,7 @@ class Classifier(L.LightningModule):
         self.classes = classes
         self.n_classes = len(classes)
         self.classes_weights = (
-            torch.FloatTensor([classes_weight[c] for c in classes])
+            torch.FloatTensor([classes_weights[c] for c in classes])
             if (classes_weights is not None)
             else None
         )
