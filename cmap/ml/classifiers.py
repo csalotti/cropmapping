@@ -211,6 +211,11 @@ class Classifier(L.LightningModule):
                 )
             )
 
+        # Data
+        # Save Labels
+        if self.current_epoch == 0:
+            self.val_labels.extend([self.classes[i] for i in y.cpu().tolist()])
+
     def on_validation_epoch_end(self):
         fig_ = sns.heatmap(
             self.val_conf_mat.compute().cpu().numpy(),
