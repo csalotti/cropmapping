@@ -14,11 +14,13 @@ def season_filter(stage):
 def merge_temps(src, dst, data_name):
     print(data_name)
     for stage in ["train", "val"]:
-        ids = range(80) if stage == "train" else range(80, 100)
+        ids = range(12, 80) if stage == "train" else range(80, 100)
         data = []
         for i in tqdm(ids):
             for f in tqdm(glob(os.path.join(src, "temperatures", str(i), "*.csv"))):
-                df = pd.read_csv(f, engine="pyarrow", index_col=0).rename(columns={"id_point":POINT_ID_COL})
+                df = pd.read_csv(f, engine="pyarrow", index_col=0).rename(
+                    columns={"id_point": POINT_ID_COL}
+                )
                 if DATE_COL not in df.columns:
                     df[DATE_COL] = os.path.basename(f)[:4]
                 if "temperature" in df.columns:

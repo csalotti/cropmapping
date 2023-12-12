@@ -8,7 +8,10 @@ from cmap.utils.constants import LABEL_COL, SEASON_COL
 
 
 def labels_sample(
-    labels: pd.DataFrame, fraction: float, seasons: List[int]
+    labels: pd.DataFrame,
+    fraction: float,
+    seasons: List[int],
+    classes: List[str],
 ) -> pd.DataFrame:
     """Labels sampling
 
@@ -17,12 +20,26 @@ def labels_sample(
     with respect to class distribution
 
     Args:
-        labels : Labels DataFrame
-        fraction : Sampling labels fraction
-        seasons : Seasons to keep
+        labels (pd.DataFrame): Labels DataFrame
+        fraction (float):  Sampling labels fraction
+        seasons (List[int]): Seasons to keep
+        classes (List[str]) : classes to consider
 
     """
-    labels = labels.query(f"{SEASON_COL} in {seasons}")
+    # Season and classes filtering
+    labels = labels.query(f"{SEASON_COL} in @seasons").query(f"{LABEL_COL} in @classes")
+
+    # Subsampling 'other' class that should be equal to the maximum
+    # positive (non-other) class for each seson
+    points_other = labels.query(f"{LABEL_COL} == 'other'")
+    points_positives = labels.quey(f"{LABEL_COL} != 'other'")
+    points_positives_dist = (
+        points_positives.value_counts().groupby(SEASON_COL).max().to_dict()
+    )
+    points_other = points_other.goupby([LABEL_COL, SEASON_COL], group_keys=False).apply(
+        lambda x: x.sample(points_positives_dist[x[SEASON_COL]])
+    )
+    labels = pd.concat([points_other, points_positives], ignore_index=True)
 
     # Subsample dataset respecting distribution of classes
     if fraction < 1.0:

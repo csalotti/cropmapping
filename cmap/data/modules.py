@@ -65,7 +65,9 @@ class SITSDataModule(L.LightningDataModule):
             labels[LABEL_COL] = labels[LABEL_COL].map(
                 lambda x: self.rpg_mapping.get(x, "other")
             )
-        labels = labels_sample(labels, seasons=seasons, fraction=self.fraction)
+        labels = labels_sample(
+            labels, seasons=seasons, classes=self.classes, fraction=self.fraction
+        )
 
         return SITSDataset(
             features_file=features_file,
