@@ -373,6 +373,7 @@ class SITSDataModule(L.LightningDataModule):
         train_seasons: List[int] = [2017, 2018, 2019, 2020],
         val_seasons: List[int] = [2021],
         include_temperatures: bool = False,
+        rpg_mapping: str = "",
         fraction: float = 1.0,
         batch_size: int = 32,
         num_workers: int = 3,
@@ -386,6 +387,14 @@ class SITSDataModule(L.LightningDataModule):
         self.train_seasons = train_seasons
         self.val_seasons = val_seasons
         self.include_temperatures = include_temperatures
+        self.rpg_mapping = (
+            yaml.safe_load(open(rpg_mapping, "r")) if rpg_mapping else None
+        )
+        self.rpg_mapping = (
+            {ri: ci for ci, rpgs in self.rpg_mapping.items() for ri in rpgs}
+            if self.rpg_mapping is not None
+            else None
+        )
 
         # Hyperparams
         self.batch_size = batch_size
@@ -403,12 +412,12 @@ class SITSDataModule(L.LightningDataModule):
             if self.include_temperatures
             else None
         )
-        labels = pd.read_parquet(
-            os.path.join(self.root, stage, "labels.pq")
-        )
+        labels = pd.read_parquet(os.path.join(self.root, stage, "labels.pq"))
 
         # Filter
         labels = labels_sample(labels, seasons=seasons, fraction=self.fraction)
+        if self.rpg_mapping is not None:
+            labels[LABEL_COL].map(self.rpg_mapping)
 
         return SITSDataset(
             features_file=features_file,
