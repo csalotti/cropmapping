@@ -32,12 +32,12 @@ def labels_sample(
     # Subsampling 'other' class that should be equal to the maximum
     # positive (non-other) class for each seson
     points_other = labels.query(f"{LABEL_COL} == 'other'")
-    points_positives = labels.quey(f"{LABEL_COL} != 'other'")
+    points_positives = labels.query(f"{LABEL_COL} != 'other'")
     points_positives_dist = (
-        points_positives.value_counts().groupby(SEASON_COL).max().to_dict()
+        points_positives[[LABEL_COL, SEASON_COL]].value_counts().groupby(SEASON_COL).max().to_dict()
     )
-    points_other = points_other.goupby([LABEL_COL, SEASON_COL], group_keys=False).apply(
-        lambda x: x.sample(points_positives_dist[x[SEASON_COL]])
+    points_other = points_other.groupby([LABEL_COL, SEASON_COL], group_keys=False).apply(
+        lambda x: x.sample(points_positives_dist[x.name[1]])
     )
     labels = pd.concat([points_other, points_positives], ignore_index=True)
 
