@@ -4,10 +4,24 @@ from typing import List, Optional, Tuple
 from datetime import date
 from numpy.typing import NDArray
 
-from cmap.utils.constants import LABEL_COL, SEASON_COL, POINT_ID_COL
+from cmap.utils.constants import LABEL_COL, SEASON_COL
 
 
-def labels_sample(labels: pd.DataFrame, fraction: float, seasons: List[int]):
+def labels_sample(
+    labels: pd.DataFrame, fraction: float, seasons: List[int]
+) -> pd.DataFrame:
+    """Labels sampling
+
+    Filter labels per season, sub sample other class to match
+    second highest label and reduce number of sample
+    with respect to class distribution
+
+    Args:
+        labels : Labels DataFrame
+        fraction : Sampling labels fraction
+        seasons : Seasons to keep
+
+    """
     labels = labels.query(f"{SEASON_COL} in {seasons}")
 
     # Subsample dataset respecting distribution of classes
@@ -21,16 +35,37 @@ def labels_sample(labels: pd.DataFrame, fraction: float, seasons: List[int]):
 
 def ts_transforms(
     ts: NDArray,
-    dates: pd.Series,
+    dates: NDArray,
     season: int,
     temperatures: Optional[NDArray] = None,
     start_month: int = 11,
-    max_n_positions: int = 397,
+    max_n_positions: int = 80,
     standardize: bool = False,
     augment: bool = False,
 ) -> Tuple[
     NDArray[np.float32], NDArray[np.int32], NDArray[np.int32], NDArray[np.uint8]
 ]:
+    """Features transformations on time seris features.
+    All features are normalized and pos-padded to fit max_n_positions.
+    Bands are divided by 10_000 (startdizeed = False) or standadized.
+    Dates are transformed into days from a starting sason day.
+    Tempratures are used as positions if provided, otherwise, days are used.
+    If augmentation is enabled, a nois N(0,1e-2) cliped at 3e-2 is applied
+    to each bands
+
+    Args:
+        ts (NDArray) : Bands data
+        dates (NDArray) : time steps
+        season (int) :  Current season
+        temperatures i(Optional[NDArray]) : Corresponding temperatures,
+        start_month (int) : Season start month (season -1)
+        max_n_positions (int) : maximum number of positions
+        standardize (bool) : standardization flag ,
+        augment (bool) : Augmentation flag
+
+    Returns:
+        (ts_norm_paddeed, days_norm_padded, positions_norm_padded, mask_padded)
+    """
     ts = ts.astype(np.float32)
     # Bands standardization
     if standardize:
@@ -46,10 +81,7 @@ def ts_transforms(
         ts = ts + np.clip(np.random.normal(0, sigma, size=ts.shape), -1 * clip, clip)
 
     # Days normalizatioin to ref date
-    days = [
-        (d - date(year=season - 1, month=start_month, day=1)).days
-        for d in dates
-    ]
+    days = [(d - date(year=season - 1, month=start_month, day=1)).days for d in dates]
 
     # GDD computation
     if temperatures is not None:
