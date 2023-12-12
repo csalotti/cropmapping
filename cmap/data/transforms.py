@@ -47,7 +47,7 @@ def ts_transforms(
 
     # Days normalizatioin to ref date
     days = [
-        (date.fromisoformat(d) - date(year=season - 1, month=start_month, day=1)).days
+        (d - date(year=season - 1, month=start_month, day=1)).days
         for d in dates
     ]
 

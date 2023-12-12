@@ -23,7 +23,7 @@ class SITSDataset(IterableDataset):
         features_file: str,
         labels: pd.DataFrame,
         classes: List[str],
-        extra_features_files: Dict[str, str],
+        extra_features_files: Dict[str, str] = {},
         ref_year: int = 2023,
         start_month: int = 11,
         end_month: int = 12,
@@ -101,7 +101,7 @@ class SITSDataset(IterableDataset):
         #     worker_features_df.groupby(POINT_ID_COL),
         #     worker_temperatures_df.groupby(POINT_ID_COL),
         # ):
-        iterator = zip(*iterator) if len(extra_features_name) > 0 else iterator
+        iterator = zip(*iterator) if len(extra_features_name) > 0 else iterator[0]
 
         for group_features in iterator:
             poi_id, features_df = (
@@ -127,8 +127,8 @@ class SITSDataset(IterableDataset):
                     )
 
                 ts = season_features_df[ALL_BANDS].values
-                dates = season_features_df[DATE_COL].values
-                label = self.labels[feat_poi_id][season]
+                dates = season_features_df[DATE_COL].dt.date.values
+                label = self.labels[poi_id][season]
 
                 ts, positions, days, mask = ts_transforms(
                     ts=ts,

@@ -397,14 +397,14 @@ class SITSDataModule(L.LightningDataModule):
 
     def get_dataset(self, stage: str, seasons: List[int]):
         # Gather
-        features_file = join(self.root, stage, "features.parquet")
+        features_file = join(self.root, stage, "features.pq")
         temperatures_file = (
-            join(self.root, stage, "temperatures.parquet")
+            join(self.root, stage, "temperatures.pq")
             if self.include_temperatures
             else None
         )
-        labels = pd.read_csv(
-            os.path.join(self.root, stage, "labels.csv"), engine="pyarrow"
+        labels = pd.read_parquet(
+            os.path.join(self.root, stage, "labels.pq")
         )
 
         # Filter
@@ -414,7 +414,6 @@ class SITSDataModule(L.LightningDataModule):
             features_file=features_file,
             labels=labels,
             classes=self.classes,
-            temperatures_file=temperatures_file,
             augment=stage == "train",
         )
 
