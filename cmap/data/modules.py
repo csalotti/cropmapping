@@ -66,7 +66,7 @@ class SITSDataModule(L.LightningDataModule):
             train_seasons (List[int]) : Training seasons
             val_seasons (List[int] : Validation seasons
             extra_features (List[str]) : Extra Features
-            rpg_mapping (str) = path to mapping yaml
+            rpg_mapping_path (str) = path to mapping yaml
             fraction (float) : Dataset sampling fraction
             batch_size (int) : Batch size
             num_workers (int) : Number of parallell Dataloader workers

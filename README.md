@@ -57,50 +57,11 @@ modules `data` and `ml`
 
 ## Structure
 
-```bash
+```
 .
-├── README.md
-├── cmap
-│   ├── __init__.py
-│   ├── cli.py
-│   ├── data
-│   │   ├── README.md
-│   │   ├── __init__.py
-│   │   ├── dataset.py
-│   │   ├── modules.py
-│   │   └── transforms.py
-│   ├── main.py
-│   ├── ml
-│   │   ├── __init__.py
-│   │   ├── autoencoders.py
-│   │   ├── classifiers.py
-│   │   ├── decoders.py
-│   │   ├── embeddings
-│   │   │   ├── __init__.py
-│   │   │   ├── bands.py
-│   │   │   └── position.py
-│   │   ├── encoders.py
-│   │   ├── gp_block.py
-│   │   └── losses.py
-│   └── utils
-│       ├── __init__.py
-│       ├── attention.py
-│       ├── chunk.py
-│       ├── constants.py
-│       ├── distributions.py
-│       ├── merge.py
-│       ├── ndvi.py
-│       ├── postgres.py
-│       └── temps.py
-├── configs
-│   ├── docker
-│   │   ├── docker-compose.yml
-│   │   └── init.sql
-│   ├── rpg_codes.yml
-│   └── runs
-│       ├── classifier.yml
-│       ├── finetuning.yml
-│       └── fra_19_21.yml
-├── poetry.lock
-└── pyproject.toml
+├── README.md       # You're here (hello :wave:")
+├── cmap            # python project
+├── configs         # RPG codes, runs config and docker files
+├── poetry.lock     # Poetry lock filee, source of truth
+└── pyproject.toml  # Poetry dependencies definitions
 ```

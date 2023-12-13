@@ -1,21 +1,44 @@
+from typing import Optional
 import torch
 import torch.nn.functional as F
-from torch import nn
+from torch import Tensor, nn
 from torch.autograd import Variable
 
 
 class FocalLoss(nn.Module):
-    def __init__(self, gamma=0, alpha=None, size_average=True):
-        super(FocalLoss, self).__init__()
+    """Focal Loss implementation
+
+    Attributes:
+        gamma (float) : Reduction factor
+        alpha (Tensor[int|float]) : input weights
+        avg (bool) : loss averaged flg, otherwise summd
+    """
+
+    def __init__(
+        self,
+        gamma: float = 0,
+        alpha: Optional[int | float] = None,
+        avg: bool = True,
+    ):
+        """Focal Loss Initialization
+
+        Args:
+            gamma (float) : Reduction factor
+            alpha (Optional[int|float]) : input weights
+            avg (bool) : loss averaged flg, otherwise summd
+
+        """
+        super().__init__()
         self.gamma = gamma
-        self.alpha = alpha
         if isinstance(alpha, (float, int)):
             self.alpha = torch.Tensor([alpha, 1 - alpha])
-        if isinstance(alpha, list):
+        elif isinstance(alpha, list):
             self.alpha = torch.Tensor(alpha)
-        self.size_average = size_average
+        else:
+            self.alpha = None
+        self.avg = avg
 
-    def forward(self, input, target):
+    def forward(self, input: Tensor, target: Tensor):
         target = target.view(-1, 1)
 
         logpt = F.log_softmax(input, dim=1)
@@ -30,7 +53,7 @@ class FocalLoss(nn.Module):
             logpt = logpt * Variable(at)
 
         loss = -1 * (1 - pt) ** self.gamma * logpt
-        if self.size_average:
+        if self.avg:
             return loss.mean()
         else:
             return loss.sum()
