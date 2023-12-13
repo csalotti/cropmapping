@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import List
 
 import pandas as pd
@@ -8,11 +9,9 @@ import yaml
 from torch.utils.data import DataLoader
 from torch.utils.data.datapipes.iter.combinatorics import ShufflerIterDataPipe
 
-import os
-from cmap.data.transforms import labels_sample
 from cmap.data.dataset import SITSDataset
+from cmap.data.transforms import labels_sample
 from cmap.utils.constants import LABEL_COL
-
 
 logger = logging.getLogger("cmap.data.module")
 # logger.addHandler(logging.FileHandler("datamodule.log"))
@@ -55,7 +54,7 @@ class SITSDataModule(L.LightningDataModule):
         train_seasons: List[int] = [2017, 2018, 2019, 2020],
         val_seasons: List[int] = [2021],
         extra_features: List[str] = [],
-        rpg_mapping: str = "",
+        rpg_mapping_path: str = "",
         fraction: float = 1.0,
         batch_size: int = 32,
         num_workers: int = 3,
@@ -80,7 +79,7 @@ class SITSDataModule(L.LightningDataModule):
         self.train_seasons = train_seasons
         self.val_seasons = val_seasons
         self.extra_features = extra_features
-        self.rpg_mapping = rpg_mapping
+        self.rpg_mapping = yaml.safe_load(open(rpg_mapping_path, "r"))
 
         # Hyperparams
         self.batch_size = batch_size
@@ -111,9 +110,8 @@ class SITSDataModule(L.LightningDataModule):
 
         # Filter
         if self.rpg_mapping is not None:
-            labels[LABEL_COL] = labels[LABEL_COL].map(
-                lambda x: self.rpg_mapping.get(x, "other")
-            )
+            labels[LABEL_COL] = labels[LABEL_COL].map(self.rpg_mapping).fillna("other")
+
         labels = labels_sample(
             labels, seasons=seasons, classes=self.classes, fraction=self.fraction
         )
@@ -122,7 +120,7 @@ class SITSDataModule(L.LightningDataModule):
             features_file=features_file,
             labels=labels,
             classes=self.classes,
-            augment=stage == "train",
+            augment=False,
             extra_features_files=extra_features_files,
         )
 
@@ -136,7 +134,6 @@ class SITSDataModule(L.LightningDataModule):
         """
         if stage == "fit":
             if self.rpg_mapping:
-                self.rpg_mapping = yaml.safe_load(open(self.rpg_mapping, "r"))
                 self.rpg_mapping = {
                     ri: ci for ci, rpgs in self.rpg_mapping.items() for ri in rpgs
                 }

@@ -1,6 +1,7 @@
+from typing import List
+
 import matplotlib.pyplot as plt
 import pandas as pd
-from typing import List
 
 
 def get_dist_plot(labels: List[str]):

@@ -1,19 +1,14 @@
-import pandas as pd
 import os
 from glob import glob
+
+import pandas as pd
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 from tqdm import tqdm
 
-from cmap.utils.constants import (
-    ALL_BANDS,
-    DATE_COL,
-    LABEL_COL,
-    POINT_ID_COL,
-    SEASON_COL,
-    TEMP_COL,
-)
+from cmap.utils.constants import (ALL_BANDS, DATE_COL, LABEL_COL, POINT_ID_COL,
+                                  SEASON_COL, TEMP_COL)
 
 
 def write_chunks(

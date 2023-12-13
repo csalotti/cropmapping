@@ -1,7 +1,9 @@
 import os
 from glob import glob
-from tqdm import tqdm
+
 import pandas as pd
+from tqdm import tqdm
+
 from .constants import DATE_COL, POINT_ID_COL
 
 
