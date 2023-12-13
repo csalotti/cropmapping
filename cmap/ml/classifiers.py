@@ -1,18 +1,19 @@
 import logging
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
-from safetensors.torch import load_model
 import numpy as np
 import pytorch_lightning as L
 import seaborn as sns
 import torch
 import torch.nn as nn
+from safetensors.torch import load_model
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR, LinearLR, SequentialLR
-from torchmetrics.classification import MulticlassConfusionMatrix, MulticlassF1Score
+from torchmetrics.classification import (MulticlassConfusionMatrix,
+                                         MulticlassF1Score)
 
-
-from cmap.utils.attention import patch_attention, plot_attention, resample, merge
+from cmap.utils.attention import (merge, patch_attention, plot_attention,
+                                  resample)
 from cmap.utils.distributions import get_dist_plot
 
 logger = logging.getLogger("cmap.ml.modules")
@@ -79,6 +80,9 @@ class Classifier(L.LightningModule):
         self.batch_attn = []
         self.train_labels = []
         self.val_labels = []
+
+        # Flags
+        self.patched = False
 
         # Layers
         self.encoder = encoder
@@ -159,8 +163,10 @@ class Classifier(L.LightningModule):
         self.train_labels.clear()
 
     def _get_attention_maps(self, ts, positions, mask):
-        for l in self.encoder.transformer_encoder.layers:
-            patch_attention(l.self_attn)
+        if not self.patched:
+            for l in self.encoder.transformer_encoder.layers:
+                patch_attention(l.self_attn)
+            self.patched = True
 
         return self.encoder.get_attention_maps(ts, positions, mask)
 

@@ -1,20 +1,15 @@
 from collections import defaultdict
 from datetime import datetime
 from typing import Dict, List
+
+import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import IterableDataset
-import pandas as pd
-import numpy as np
-from cmap.data.transforms import ts_transforms
-import torch
 
-from cmap.utils.constants import (
-    ALL_BANDS,
-    DATE_COL,
-    LABEL_COL,
-    POINT_ID_COL,
-    SEASON_COL,
-)
+from cmap.data.transforms import ts_transforms
+from cmap.utils.constants import (ALL_BANDS, DATE_COL, LABEL_COL, POINT_ID_COL,
+                                  SEASON_COL)
 
 
 class SITSDataset(IterableDataset):

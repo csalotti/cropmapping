@@ -1,12 +1,13 @@
 from random import random
-import pytorch_lightning as L
+
 import numpy as np
+import pytorch_lightning as L
 from torch import nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR, LinearLR, SequentialLR
 
+from cmap.utils.attention import patch_attention, plot_attention
 from cmap.utils.ndvi import plot_ndvi
-from cmap.utils.attention import plot_attention, patch_attention
 
 
 class AutoEncoder(L.LightningModule):

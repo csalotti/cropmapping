@@ -1,7 +1,8 @@
+from datetime import date
+from typing import List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
-from typing import List, Optional, Tuple
-from datetime import date
 from numpy.typing import NDArray
 
 from cmap.utils.constants import LABEL_COL, SEASON_COL
@@ -33,12 +34,16 @@ def labels_sample(
     # positive (non-other) class for each seson
     points_other = labels.query(f"{LABEL_COL} == 'other'")
     points_positives = labels.query(f"{LABEL_COL} != 'other'")
-    points_positives_dist = (
-        points_positives[[LABEL_COL, SEASON_COL]].value_counts().groupby(SEASON_COL).max().to_dict()
+    top_seasons_dist = (
+        points_positives[[LABEL_COL, SEASON_COL]]
+        .value_counts()
+        .groupby(SEASON_COL)
+        .max()
+        .to_dict()
     )
-    points_other = points_other.groupby([LABEL_COL, SEASON_COL], group_keys=False).apply(
-        lambda x: x.sample(points_positives_dist[x.name[1]])
-    )
+    points_other = points_other.groupby(
+        [LABEL_COL, SEASON_COL], group_keys=False
+    ).apply(lambda x: x.sample(top_seasons_dist[x.name[1]]))
     labels = pd.concat([points_other, points_positives], ignore_index=True)
 
     # Subsample dataset respecting distribution of classes

@@ -76,23 +76,23 @@ Here is a example a Configuration used for CLI runs
 
 ```yaml
 data:
-class_path: cmap.data.modules.SITSDataModule
-init_args:
-root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_19_21
-rpg_mapping: configs/rpg_codes.yml
-num_workers: 4
-batch_size: 512
-train_seasons:
-  - 2019
-  - 2020
-val_seasons:
-  - 2021
-classes:
-  - other
-  - ble_dur
-  - ble_tendre
-  - mais
-  - orge
-  - colza
-  - tournesol
+  class_path: cmap.data.modules.SITSDataModule
+  init_args:
+  root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_19_21
+  rpg_mapping: configs/rpg_codes.yml
+  num_workers: 4
+  batch_size: 512
+  train_seasons:
+    - 2019
+    - 2020
+  val_seasons:
+    - 2021
+  classes:
+    - other
+    - ble_dur
+    - ble_tendre
+    - mais
+    - orge
+    - colza
+    - tournesol
 ```

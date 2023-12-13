@@ -1,11 +1,11 @@
 from datetime import date, timedelta
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from numpy.typing import NDArray
 
-import matplotlib.pyplot as plt
 
 def ndvi(red: NDArray, nir: NDArray):
     return np.where(nir != 0, (nir - red) / (nir + red), 0)

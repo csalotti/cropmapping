@@ -4,7 +4,6 @@ from multiprocessing import set_start_method
 import pytorch_lightning as L
 from pytorch_lightning.cli import LightningCLI
 
-
 # configure logging at the root level of Lightning
 logging.getLogger("cmap").setLevel(logging.DEBUG)
 

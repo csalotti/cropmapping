@@ -1,7 +1,7 @@
 import logging
 
-from torch import Tensor, nn
 import torch
+from torch import Tensor, nn
 
 from cmap.utils.attention import SaveAttentionMapHook
 
