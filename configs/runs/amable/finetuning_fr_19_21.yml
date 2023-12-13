@@ -7,7 +7,7 @@ data:
   class_path: cmap.data.modules.SITSDataModule
   init_args:
     root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_19_21
-    rpg_mapping: configs/rpg_codes.yml
+    rpg_mapping_path: configs/rpg_codes.yml
     num_workers: 4
     batch_size: 512
     train_seasons:
