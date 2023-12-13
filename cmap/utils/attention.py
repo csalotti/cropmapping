@@ -1,5 +1,3 @@
-from datetime import date
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -42,7 +40,7 @@ def resample(attention_map, days, masks, targets, ref_month=11, ref_year=2023):
     for attn_maps, d, m, t in zip(attention_map, days, masks, targets):
         attn_maps = attn_maps[:, : m.sum(), : m.sum()].mean(axis=1)
         data = dict(enumerate(attn_maps))
-        data["days"] = d[:m.sum()]
+        data["days"] = d[: m.sum()]
         df = pd.DataFrame(data).melt(
             id_vars="days",
             var_name="layer",

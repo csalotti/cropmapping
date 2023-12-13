@@ -8,7 +8,21 @@ logger = logging.getLogger("cmap.ml.decoders")
 
 
 class MulticlassClassification(nn.Module):
+    """Classification head from SITS Former
+
+    Attributes:
+        linear : FC Layers with matrix dimension
+            hidden x num_classes
+
+    """
+
     def __init__(self, hidden, num_classes):
+        """Multiclass head initialization
+
+        Args:
+            hidden : Input dimension size
+            num_classes : Number of classes
+        """
         super().__init__()
         self.linear = nn.Linear(hidden, num_classes)
 
@@ -21,18 +35,3 @@ class MulticlassClassification(nn.Module):
         x = self.linear(x.float())
 
         return x
-
-
-class MLPDecoder(nn.Module):
-    def __init__(self, sizes: List[int]):
-        super().__init__()
-        layers = []
-        for i in range(1, len(sizes)):
-            layers.append(nn.Linear(in_features=sizes[i - 1], out_features=sizes[i]))
-            layers.append(nn.BatchNorm1d(sizes[i]))
-            layers.append(nn.ReLU())
-
-        self.decoder = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.decoder(x)
