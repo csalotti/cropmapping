@@ -1,0 +1,4 @@
+callbacks: 
+    class_path: pytorch_lightning.callbacks.LearningRateMonitor
+max_epochs: 200
+precision: 32

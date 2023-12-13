@@ -13,6 +13,7 @@ def labels_sample(
     fraction: float,
     seasons: List[int],
     classes: List[str],
+    subsample: bool = False,
 ) -> pd.DataFrame:
     """Labels sampling
 
@@ -32,19 +33,20 @@ def labels_sample(
 
     # Subsampling 'other' class that should be equal to the maximum
     # positive (non-other) class for each seson
-    points_other = labels.query(f"{LABEL_COL} == 'other'")
-    points_positives = labels.query(f"{LABEL_COL} != 'other'")
-    top_seasons_dist = (
-        points_positives[[LABEL_COL, SEASON_COL]]
-        .value_counts()
-        .groupby(SEASON_COL)
-        .max()
-        .to_dict()
-    )
-    points_other = points_other.groupby(
-        [LABEL_COL, SEASON_COL], group_keys=False
-    ).apply(lambda x: x.sample(top_seasons_dist[x.name[1]]))
-    labels = pd.concat([points_other, points_positives], ignore_index=True)
+    if subsample:
+        points_other = labels.query(f"{LABEL_COL} == 'other'")
+        points_positives = labels.query(f"{LABEL_COL} != 'other'")
+        top_seasons_dist = (
+            points_positives[[LABEL_COL, SEASON_COL]]
+            .value_counts()
+            .groupby(SEASON_COL)
+            .max()
+            .to_dict()
+        )
+        points_other = points_other.groupby(
+            [LABEL_COL, SEASON_COL], group_keys=False
+        ).apply(lambda x: x.sample(top_seasons_dist[x.name[1]]))
+        labels = pd.concat([points_other, points_positives], ignore_index=True)
 
     # Subsample dataset respecting distribution of classes
     if fraction < 1.0:

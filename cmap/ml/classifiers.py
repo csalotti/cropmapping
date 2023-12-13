@@ -9,11 +9,9 @@ import torch.nn as nn
 from safetensors.torch import load_model
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR, LinearLR, SequentialLR
-from torchmetrics.classification import (MulticlassConfusionMatrix,
-                                         MulticlassF1Score)
+from torchmetrics.classification import MulticlassConfusionMatrix, MulticlassF1Score
 
-from cmap.utils.attention import (merge, patch_attention, plot_attention,
-                                  resample)
+from cmap.utils.attention import merge, patch_attention, plot_attention, resample
 from cmap.utils.distributions import get_dist_plot
 
 logger = logging.getLogger("cmap.ml.modules")
@@ -196,7 +194,7 @@ class Classifier(L.LightningModule):
 
         self.val_conf_mat.update(y_hat, y)
 
-        # Save embeddings
+        # Save embeddings & Attention Maps
         if self.current_epoch % 10 == 1:
             self.val_emb.append(
                 {
@@ -204,9 +202,6 @@ class Classifier(L.LightningModule):
                     "labels": [self.classes[yi] for yi in y.cpu().tolist()],
                 }
             )
-
-        # Save data for attention maps
-        if (self.current_epoch > 0) or (batch_idx == 0):
             attn_maps = self._get_attention_maps(ts, positions, mask)
             self.batch_attn.append(
                 resample(
@@ -217,7 +212,6 @@ class Classifier(L.LightningModule):
                 )
             )
 
-        # Data
         # Save Labels
         if self.current_epoch == 0:
             self.val_labels.extend([self.classes[i] for i in y.cpu().tolist()])
