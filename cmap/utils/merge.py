@@ -1,8 +1,11 @@
 import os
+from functools import partial
 from glob import glob
 
 import pandas as pd
 from tqdm import tqdm
+from tqdm.contrib.concurrent import process_map  # or thread_map
+
 
 from .constants import DATE_COL, POINT_ID_COL
 
@@ -12,30 +15,45 @@ def season_filter(stage):
     end = 2020 if stage == "train" else 2021
     return f"({DATE_COL} >= '{start}-11-01') & ({DATE_COL} < '{end}-12-01')"
 
+def parquet_filter(stage):
+    start = 2018 if stage == "train" else 2020
+    end = 2020 if stage == "train" else 2021
+    return [(DATE_COL, ">=", f"{start}-11-01") , (DATE_COL, "<", f"{end}-12-01")]
 
-def merge_temps(src, dst, data_name):
-    print(data_name)
+def get_temp_folder(s_filter, f):
+    df = pd.read_csv(f, engine="pyarrow", index_col=0).rename(
+        columns={"id_point": POINT_ID_COL}
+    )
+    if DATE_COL not in df.columns:
+        df[DATE_COL] = os.path.basename(f)[:-4]
+    if "temperature" in df.columns:
+        df["temperature"] -= 273.15
+    
+    return df.query(s_filter)
+
+def convert_to_parquet(src, dst, max_workers=2):
     for stage in ["train", "val"]:
-        ids = range(12, 80) if stage == "train" else range(80, 100)
-        data = []
+        s_filter = season_filter(stage) 
+        ids = range(80) if stage == "train" else range(80, 100)
         for i in tqdm(ids):
-            for f in tqdm(glob(os.path.join(src, "temperatures", str(i), "*.csv"))):
-                df = pd.read_csv(f, engine="pyarrow", index_col=0).rename(
-                    columns={"id_point": POINT_ID_COL}
-                )
-                if DATE_COL not in df.columns:
-                    df[DATE_COL] = os.path.basename(f)[:4]
-                if "temperature" in df.columns:
-                    df["temperature"] -= 273.15
-                df = df.query(season_filter(stage))
-                data.append(df)
-            pd.concat(data, ignore_index=True).sort_values(
-                [POINT_ID_COL, DATE_COL]
-            ).to_parquet(os.path.join(dst, stage, data_name, f"{i}.pq"))
+            files = glob(os.path.join(src , "temperatures", str(i), "*.csv"))
+            fn = partial(get_temp_folder, s_filter)
+            temp_data = process_map(fn, files,max_workers=max_workers, chunksize=10)
+            temps_df = pd.concat(temp_data, ignore_index=True).sort_values([POINT_ID_COL, DATE_COL])
+            temps_df.to_parquet(os.path.join(dst, stage, "temperatures", f"{i}.pq"), index=False)
 
+
+
+def merge_temperatures_parquet(src):
+    for stage in ["train", "val"]:
+        ids = range(80) if stage == "train" else range(80, 100)
+        data = [pd.read_parquet(os.path.join(src, stage, "temperatures", f"{i}.pq")) for i in ids]
+        temp_df = pd.concat(data, ignore_index=True)
+        temp_df.to_parquet(os.path.join(src, stage, "temperatures.pq"))
 
 if __name__ == "__main__":
     src = "/mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_01234"
     dst = "/mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_19_21"
 
-    merge_temps(src, dst, "temperatures")
+    convert_to_parquet(src, dst, max_workers=16)
+    merge_temperatures_parquet(dst)
