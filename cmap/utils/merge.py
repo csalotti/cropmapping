@@ -44,16 +44,8 @@ def convert_to_parquet(src, dst, max_workers=2):
 
 
 
-def merge_temperatures_parquet(src):
-    for stage in ["train", "val"]:
-        ids = range(80) if stage == "train" else range(80, 100)
-        data = [pd.read_parquet(os.path.join(src, stage, "temperatures", f"{i}.pq")) for i in ids]
-        temp_df = pd.concat(data, ignore_index=True)
-        temp_df.to_parquet(os.path.join(src, stage, "temperatures.pq"))
-
 if __name__ == "__main__":
     src = "/mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_01234"
     dst = "/mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_19_21"
 
-    convert_to_parquet(src, dst, max_workers=16)
-    merge_temperatures_parquet(dst)
+   convert_to_parquet(src, dst, max_workers=16)
