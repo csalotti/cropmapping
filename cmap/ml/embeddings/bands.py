@@ -132,5 +132,5 @@ class PixelEncoding(nn.Module):
         seq_length = ts.size(1)
         ts = ts.view(batch_size * seq_length, -1)
         ts_encoded = self.encoder(ts)
-        ts_encoded = ts.view(batch_size, seq_length, -1)
+        ts_encoded = ts_encoded.view(batch_size, seq_length, -1)
         return ts_encoded

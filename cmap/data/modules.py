@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import List
+from typing import List, Dict
 
 import pandas as pd
 import pytorch_lightning as L
@@ -40,7 +40,7 @@ class SITSDataModule(L.LightningDataModule):
         classes (List[str) : Expected classes
         train_seasons (List[int]) : Training seasons
         val_seasons (List[int] : Validation seasons
-        extra_features (List[str]) : Extra Features
+        extra_features (Dict[str, Dict[str, List[str]]) : Extra Features
         rpg_mapping (Dict[str, str])=  RPG CODE to label mapping
         fraction (float) : Dataset sampling fraction
         batch_size (int) : Batch size
@@ -53,7 +53,7 @@ class SITSDataModule(L.LightningDataModule):
         classes: List[str],
         train_seasons: List[int] = [2017, 2018, 2019, 2020],
         val_seasons: List[int] = [2021],
-        extra_features: List[str] = [],
+        extra_features: Dict[str, Dict[str, List[str]]] = {},
         rpg_mapping_path: str = "",
         fraction: float = 1.0,
         batch_size: int = 32,
@@ -65,7 +65,7 @@ class SITSDataModule(L.LightningDataModule):
             classes (List[str) : Expected classes
             train_seasons (List[int]) : Training seasons
             val_seasons (List[int] : Validation seasons
-            extra_features (List[str]) : Extra Features
+            extra_features (Dict[str, Dict[str, List[str]]) : Extra Features
             rpg_mapping_path (str) = path to mapping yaml
             fraction (float) : Dataset sampling fraction
             batch_size (int) : Batch size
@@ -105,7 +105,11 @@ class SITSDataModule(L.LightningDataModule):
         features_file = os.path.join(self.root, stage, "features.pq")
         labels = pd.read_parquet(os.path.join(self.root, stage, "labels.pq"))
         extra_features_files = {
-            fn: os.path.join(self.root, stage, f"{fn}.pq") for fn in self.extra_features
+            fn: {
+                "path" : os.path.join(self.root, stage, fn),
+                "features" : f_conf["features_cols"]
+            }
+                for fn, f_conf in self.extra_features.items()
         }
 
         # Filter

@@ -3,6 +3,7 @@ from functools import partial
 from glob import glob
 
 import pandas as pd
+import pyarrow.parquet as pq
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map  # or thread_map
 
@@ -43,9 +44,15 @@ def convert_to_parquet(src, dst, max_workers=2):
             temps_df.to_parquet(os.path.join(dst, stage, "temperatures", f"{i}.pq"), index=False)
 
 
+def merge_parquet(root):
+    for stage in ["train", "val"]:
+        files = glob(os.path.join(root, stage, "temperatures", "*.pq"))
+        schema = pq.ParquetFile(files[0]).schema_arrow
+        with pq.ParquetWriter(os.path.join(root, stage, "temperatures.pq"), schema=schema) as writer:
+            for f in tqdm(files):
+                writer.write_table(pq.read_table(f, schema=schema))
 
 if __name__ == "__main__":
-    src = "/mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_23_tiles_01234"
-    dst = "/mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_19_21"
+    root = "/mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_19_21"
 
-   convert_to_parquet(src, dst, max_workers=16)
+    merge_parquet(root)

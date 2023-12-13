@@ -1,3 +1,4 @@
+import os
 from collections import defaultdict
 from datetime import datetime
 from typing import Dict, List
@@ -24,10 +25,10 @@ class SITSDataset(IterableDataset):
             Format :
             { '<point_id> : { <season_1> : <label_1>, <season_2> : <label_2>}}
         classes (List[str]) : Sets of expected classes
-        extra_features_files (Dict[str, Dict[str, str]]) : Maps of additionnal files with
+        extra_features_files (Dict[str, Dict[str, str | List[str]]]) : Maps of additionnal files with
             their name and path for train and validation datasets.
             The dictionnary must have the following structure:
-            {'temperatures' : {'train' : <path>, 'val' : <path}}
+            {'temperatures' : {'file' : <fpath> , 'features_cols' : [<f1>, <f2>]}}
         start_month (int) : Starting season month for season - 1
         end_month (int) : Ending season month for season (can overlap with season + 1)
         max_n_positions (int) : Maximum number of positions sampled on time serie
@@ -42,7 +43,7 @@ class SITSDataset(IterableDataset):
         features_file: str,
         labels: pd.DataFrame,
         classes: List[str],
-        extra_features_files: Dict[str, str] = {},
+        extra_features_files: Dict[str, Dict[str, str | List[str]]] = {},
         ref_year: int = 2023,
         start_month: int = 11,
         end_month: int = 12,
@@ -57,10 +58,10 @@ class SITSDataset(IterableDataset):
             features_file (str) : path to features parquet
             labels (pd.DataFrame): Labels DataFrame
             classes (List[str]): List of classes
-            extra_features_files (Dict[str, Dict[str, str]]) : Maps of additionnal
+            extra_features_files (Dict[str, Dict[str, str | List[str]]]) : Maps of additionnal files with
                 files with their name and path for train and validation datasets.
                 The dictionnary must have the following structure:
-                {'temperatures' : {'train' : <path>, 'val' : <path}}
+                {'temperatures' : {'path' : <fpath> , 'features_cols' : [<f1>, <f2>]}}
             ref_year (int): Year to compute number of maximum positions.
             start_month (int): Starting season month for season - 1
             end_month (int): Ending season month for season (can overlap with season + 1)
@@ -108,9 +109,12 @@ class SITSDataset(IterableDataset):
             Dataframe with point ids data
 
         """
-        with open(file, "rb") as f:
-            df = pd.read_parquet(f, filters=[(POINT_ID_COL, "in", poi_ids)])
-        return df
+        if os.path.isfile(file):
+            with open(file, "rb") as f:
+                df = pd.read_parquet(f, filters=[(POINT_ID_COL, "in", poi_ids)])
+            return df
+        else:
+            return pd.read_parquet(file, filters=[(POINT_ID_COL, "in", poi_ids)])
 
     def filter_season(self, df: pd.DataFrame, season: int) -> pd.DataFrame:
         """Filter time series given the season. It is based
@@ -155,20 +159,22 @@ class SITSDataset(IterableDataset):
         iterator = [worker_features_df.groupby(POINT_ID_COL)]
 
         # Extra features augmentation
-        extra_features_name = []
-        for extra_id, extra_file in self.extra_features_files:
-            extra_features_name.append(extra_id)
-            worker_extra_df = self.get_table(extra_file, worker_poi_ids)
+        extra_features= []
+        for extra_id, extra_conf in self.extra_features_files.items():
+            fpath = extra_conf['path']
+            features_cols = extra_conf['features']
+            extra_features.append({extra_id : features_cols})
+            worker_extra_df = self.get_table(fpath, worker_poi_ids)
             iterator.append(worker_extra_df.groupby(POINT_ID_COL))
 
-        iterator = zip(*iterator) if len(extra_features_name) > 0 else iterator[0]
+        iterator = zip(*iterator) if len(extra_features) > 0 else iterator[0]
 
         # Iteration through group per point id.
         # If additionnal features are added, they will be included
         # in the loop
         for group_features in iterator:
             poi_id, features_df = (
-                group_features if len(extra_features_name) == 0 else group_features[0]
+                group_features if len(extra_features) == 0 else group_features[0]
             )
 
             # Season filtering
@@ -178,19 +184,20 @@ class SITSDataset(IterableDataset):
                 if len(season_features_df) < 5:
                     continue
 
-                extra_features_df = {}
+                extra_features_values = {}
 
                 # Extra features season filtering
-                for i, extra_name in enumerate(extra_features_name):
+                for i, ef in  enumerate(extra_features):
+                    ef_name, ef_feat_cols = list(ef.items())[0]
                     if group_features[i + 1][0] != poi_id:
                         ValueError(
-                            f"{extra_name} and features don't match"
+                            f"{ef_name} and features don't match"
                             + f"{group_features[i+1][0]} != {poi_id}"
                         )
-
-                    extra_features_df[extra_name] = self.filter_season(
+                    extra_features_values[ef_name] = self.filter_season(
                         group_features[i + 1][1], season
-                    )
+                    )[ef_feat_cols].values
+
 
                 ts = season_features_df[ALL_BANDS].values
                 dates = season_features_df[DATE_COL].dt.date.values
@@ -205,7 +212,7 @@ class SITSDataset(IterableDataset):
                     max_n_positions=self.max_n_positions,
                     standardize=self.standardize,
                     augment=self.augment,
-                    **extra_features_df,
+                    **extra_features_values,
                 )
 
                 # Convert to dicto of tensors
