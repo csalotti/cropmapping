@@ -28,7 +28,7 @@ class SITSDataset(IterableDataset):
         extra_features_files (Dict[str, Dict[str, str | List[str]]]) : Maps of additionnal files with
             their name and path for train and validation datasets.
             The dictionnary must have the following structure:
-            {'temperatures' : {'file' : <fpath> , 'features_cols' : [<f1>, <f2>]}}
+            {'temperatures' : {'path' : <fpath> , 'features_cols' : [<f1>, <f2>]}}
         start_month (int) : Starting season month for season - 1
         end_month (int) : Ending season month for season (can overlap with season + 1)
         max_n_positions (int) : Maximum number of positions sampled on time serie
@@ -98,23 +98,23 @@ class SITSDataset(IterableDataset):
         self.standardize = standardize
         self.augment = augment
 
-    def get_table(self, file: str, poi_ids: List[str]) -> pd.DataFrame:
+    def get_table(self, file: str, poi_ids: List[str], cols : List[str]) -> pd.DataFrame:
         """Retrieve row from parquet given a set of point ids
 
         Args:
             file (str): parquet file path
-            poi_ids (List[str]): Selected point idsa
+            poi_ids (List[str]): Selected point ids
+            cols (List[str]): Selected columns 
 
         Returns:
             Dataframe with point ids data
 
         """
-        if os.path.isfile(file):
-            with open(file, "rb") as f:
-                df = pd.read_parquet(f, filters=[(POINT_ID_COL, "in", poi_ids)])
-            return df
-        else:
-            return pd.read_parquet(file, filters=[(POINT_ID_COL, "in", poi_ids)])
+        with open(file, "rb") as f:
+            df = pd.read_parquet(f, columns=cols, filters=[(POINT_ID_COL, "in", poi_ids)])
+            df[DATE_COL] = pd.to_datetime(df[DATE_COL])
+            df = df.sort_values([POINT_ID_COL, DATE_COL])
+        return df
 
     def filter_season(self, df: pd.DataFrame, season: int) -> pd.DataFrame:
         """Filter time series given the season. It is based
@@ -153,80 +153,86 @@ class SITSDataset(IterableDataset):
         else:
             worker_poi_ids = list(self.labels.keys())
 
-        # Workers features attribution
-        worker_features_df = self.get_table(self.features_file, worker_poi_ids)
-        worker_features_df.columns = worker_features_df.columns.str.strip().str.lower()
-        iterator = [worker_features_df.groupby(POINT_ID_COL)]
+        chunk_size = 100_000
+        n_chunks = max(len(worker_poi_ids)//chunk_size, 1)
+        for i in range(n_chunks):
+            sub_poi_ids = worker_poi_ids[i*chunk_size:min((i+1)*chunk_size, len(worker_poi_ids))]
 
-        # Extra features augmentation
-        extra_features= []
-        for extra_id, extra_conf in self.extra_features_files.items():
-            fpath = extra_conf['path']
-            features_cols = extra_conf['features']
-            extra_features.append({extra_id : features_cols})
-            worker_extra_df = self.get_table(fpath, worker_poi_ids)
-            iterator.append(worker_extra_df.groupby(POINT_ID_COL))
+            # Workers features attribution
+            worker_features_df = self.get_table(self.features_file, sub_poi_ids, cols=[POINT_ID_COL, DATE_COL] + ALL_BANDS)
+            iterator = [worker_features_df.groupby(POINT_ID_COL, observed=True)]
 
-        iterator = zip(*iterator) if len(extra_features) > 0 else iterator[0]
+            # Extra features augmentation
+            extra_features= []
+            for extra_id, extra_conf in self.extra_features_files.items():
+                fpath = extra_conf['path']
+                features_cols = extra_conf['features']
+                extra_features.append({extra_id : features_cols})
+                worker_extra_df = self.get_table(fpath, sub_poi_ids, cols=[POINT_ID_COL, DATE_COL] + features_cols)
+                iterator.append(worker_extra_df.groupby(POINT_ID_COL, observed=True))
 
-        # Iteration through group per point id.
-        # If additionnal features are added, they will be included
-        # in the loop
-        for group_features in iterator:
-            poi_id, features_df = (
-                group_features if len(extra_features) == 0 else group_features[0]
-            )
+            iterator = zip(*iterator) if len(extra_features) > 0 else iterator[0]
 
-            # Season filtering
-            for season in self.labels[poi_id].keys():
-                season_features_df = self.filter_season(features_df, season)
-
-                if len(season_features_df) < 5:
-                    continue
-
-                extra_features_values = {}
-
-                # Extra features season filtering
-                for i, ef in  enumerate(extra_features):
-                    ef_name, ef_feat_cols = list(ef.items())[0]
-                    if group_features[i + 1][0] != poi_id:
-                        ValueError(
-                            f"{ef_name} and features don't match"
-                            + f"{group_features[i+1][0]} != {poi_id}"
-                        )
-                    extra_features_values[ef_name] = self.filter_season(
-                        group_features[i + 1][1], season
-                    )[ef_feat_cols].values
-
-
-                ts = season_features_df[ALL_BANDS].values
-                dates = season_features_df[DATE_COL].dt.date.values
-                label = self.labels[poi_id][season]
-
-                # Features transforms
-                ts, positions, days, mask = ts_transforms(
-                    ts=ts,
-                    dates=dates,
-                    season=season,
-                    start_month=self.start_month,
-                    max_n_positions=self.max_n_positions,
-                    standardize=self.standardize,
-                    augment=self.augment,
-                    **extra_features_values,
+            # Iteration through group per point id.
+            # If additionnal features are added, they will be included
+            # in the loop
+            for group_features in iterator:
+                poi_id, features_df = (
+                    group_features if len(extra_features) == 0 else group_features[0]
                 )
 
-                # Convert to dicto of tensors
-                class_id = np.array([self.classes[label]])
-                output = {
-                    "positions": positions,
-                    "days": days,
-                    "mask": mask,
-                    "ts": ts,
-                    "class": class_id,
-                }
+                # Season filtering
+                for season in self.labels[poi_id].keys():
+                    season_features_df = self.filter_season(features_df, season)
 
-                tensor_output = {
-                    key: torch.from_numpy(value) for key, value in output.items()
-                }
+                    if len(season_features_df) < 5:
+                        raise ValueError(f"{poi_id}\n{season_df}")
+                        continue
 
-                yield tensor_output
+                    extra_features_values = {}
+
+                    # Extra features season filtering
+                    for i, ef in  enumerate(extra_features):
+                        ef_name, ef_feat_cols = list(ef.items())[0]
+                        if group_features[i + 1][0] != poi_id:
+                            raise ValueError(
+                                f"{ef_name} and features don't match"
+                                + f"{group_features[i+1][0]} != {poi_id}"
+                            )
+                        extra_features_values[ef_name] = self.filter_season(
+                            group_features[i + 1][1], season
+                        )[ef_feat_cols].values
+
+
+                    ts = season_features_df[ALL_BANDS].values
+                    dates = season_features_df[DATE_COL].dt.date.values
+                    label = self.labels[poi_id][season]
+
+                    # Features transforms
+                    ts, positions, days, mask = ts_transforms(
+                        ts=ts,
+                        dates=dates,
+                        season=season,
+                        start_month=self.start_month,
+                        max_n_positions=self.max_n_positions,
+                        standardize=self.standardize,
+                        augment=self.augment,
+                        **extra_features_values,
+                    )
+
+                    # Convert to dicto of tensors
+                    class_id = np.array([self.classes[label]])
+                    output = {
+                        "positions": positions,
+                        "days": days,
+                        "mask": mask,
+                        "ts": ts,
+                        "class": class_id,
+                    }
+
+
+                    tensor_output = {
+                        key: torch.from_numpy(value) for key, value in output.items()
+                    }
+
+                    yield tensor_output

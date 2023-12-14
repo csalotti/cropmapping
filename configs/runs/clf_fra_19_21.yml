@@ -9,11 +9,11 @@ data:
     root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_19_21
     extra_features:
       temperatures:
+        file: temperatures.pq
         features_cols: 
           - temperature
     rpg_mapping_path: configs/rpg_codes.yml
-    fraction : 0.1
-    num_workers: 4
+    num_workers: 8
     batch_size: 512
     train_seasons:
       - 2019

@@ -109,8 +109,9 @@ def ts_transforms(
 
     # GDD computation
     if temperatures is not None:
-        temperatures = np.cumsum(temperatures)[days]
-
+        temperatures = np.cumsum(temperatures)
+        temperatures = temperatures[days]
+    
     # Positions
     positions = temperatures if temperatures is not None else days
 

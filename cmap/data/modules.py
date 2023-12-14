@@ -40,7 +40,10 @@ class SITSDataModule(L.LightningDataModule):
         classes (List[str) : Expected classes
         train_seasons (List[int]) : Training seasons
         val_seasons (List[int] : Validation seasons
-        extra_features (Dict[str, Dict[str, List[str]]) : Extra Features
+        extra_features (Dict[str, Dict[str, str | List[str]]]) : Maps of
+            additionnal files with their name and path for train and validation datasets.
+            The dictionnary must have the following structure:
+            {'temperatures' : {'file' : <fname> , 'features_cols' : [<f1>, <f2>]}}
         rpg_mapping (Dict[str, str])=  RPG CODE to label mapping
         fraction (float) : Dataset sampling fraction
         batch_size (int) : Batch size
@@ -53,7 +56,7 @@ class SITSDataModule(L.LightningDataModule):
         classes: List[str],
         train_seasons: List[int] = [2017, 2018, 2019, 2020],
         val_seasons: List[int] = [2021],
-        extra_features: Dict[str, Dict[str, List[str]]] = {},
+        extra_features: Dict[str, Dict[str, str | List[str]]] = {},
         rpg_mapping_path: str = "",
         fraction: float = 1.0,
         batch_size: int = 32,
@@ -65,7 +68,10 @@ class SITSDataModule(L.LightningDataModule):
             classes (List[str) : Expected classes
             train_seasons (List[int]) : Training seasons
             val_seasons (List[int] : Validation seasons
-            extra_features (Dict[str, Dict[str, List[str]]) : Extra Features
+            extra_features (Dict[str, Dict[str, str | List[str]]]) : Maps of
+                additionnal files with their name and path for train and validation datasets.
+                The dictionnary must have the following structure:
+                {'temperatures' : {'file' : <fname> , 'features_cols' : [<f1>, <f2>]}}
             rpg_mapping_path (str) = path to mapping yaml
             fraction (float) : Dataset sampling fraction
             batch_size (int) : Batch size
@@ -106,7 +112,7 @@ class SITSDataModule(L.LightningDataModule):
         labels = pd.read_parquet(os.path.join(self.root, stage, "labels.pq"))
         extra_features_files = {
             fn: {
-                "path" : os.path.join(self.root, stage, fn),
+                "path" : os.path.join(self.root, stage, f_conf['file']),
                 "features" : f_conf["features_cols"]
             }
                 for fn, f_conf in self.extra_features.items()
