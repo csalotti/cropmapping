@@ -72,10 +72,6 @@ class SITSDataModule(L.LightningDataModule):
                 additionnal files with their name and path for train and validation datasets.
                 The dictionnary must have the following structure:
                 {'temperatures' : {'file' : <fname> , 'features_cols' : [<f1>, <f2>]}}
-            chunk_size (int) : Number of poi_id query and process at the same time in memory.
-                if -1, all the workers ids are considered (default : -1)
-                chunk_size (int) : Number of poi_id query and process at the same time in memory.
-                if -1, all the workers ids are considered (default : -1)
             rpg_mapping_path (str) = path to mapping yaml
             fraction (float) : Dataset sampling fraction
             batch_size (int) : Batch size
@@ -136,7 +132,6 @@ class SITSDataModule(L.LightningDataModule):
             classes=self.classes,
             augment=False,
             extra_features_files=extra_features_files,
-            chunk_size=self.chunk_size,
         )
 
     def setup(self, stage: str):
