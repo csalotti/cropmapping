@@ -106,10 +106,7 @@ class Classifier(L.LightningModule):
         self.wd = wd
 
         # Metrics
-        # self.criterion = nn.CrossEntropyLoss(weight=self.classes_weights)
         self.criterion = criterion
-        self.criterion.register_buffer('weight', self.classes_weights)
-        self.criterion.weight = self.classes_weights
 
         self.train_f1 = MulticlassF1Score(num_classes=len(classes))
         self.val_f1 = MulticlassF1Score(num_classes=len(classes))
