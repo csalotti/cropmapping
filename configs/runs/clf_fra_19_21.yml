@@ -13,7 +13,6 @@ data:
         features_cols: 
           - temperature
     rpg_mapping_path: configs/rpg_codes.yml
-    chunk_size: 5000
     num_workers: 20
     batch_size: 256
     train_seasons:

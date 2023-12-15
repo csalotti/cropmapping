@@ -57,7 +57,6 @@ class SITSDataModule(L.LightningDataModule):
         train_seasons: List[int] = [2017, 2018, 2019, 2020],
         val_seasons: List[int] = [2021],
         extra_features: Dict[str, Dict[str, str | List[str]]] = {},
-        chunk_size : int = -1,
         rpg_mapping_path: str = "",
         fraction: float = 1.0,
         batch_size: int = 32,
@@ -73,10 +72,6 @@ class SITSDataModule(L.LightningDataModule):
                 additionnal files with their name and path for train and validation datasets.
                 The dictionnary must have the following structure:
                 {'temperatures' : {'file' : <fname> , 'features_cols' : [<f1>, <f2>]}}
-            chunk_size (int) : Number of poi_id query and process at the same time in memory.
-                if -1, all the workers ids are considered (default : -1)
-                chunk_size (int) : Number of poi_id query and process at the same time in memory.
-                if -1, all the workers ids are considered (default : -1)
             rpg_mapping_path (str) = path to mapping yaml
             fraction (float) : Dataset sampling fraction
             batch_size (int) : Batch size
@@ -93,7 +88,6 @@ class SITSDataModule(L.LightningDataModule):
         self.rpg_mapping = yaml.safe_load(open(rpg_mapping_path, "r"))
 
         # Hyperparams
-        self.chunk_size = chunk_size
         self.batch_size = batch_size
         self.num_workers = num_workers
 
@@ -118,10 +112,10 @@ class SITSDataModule(L.LightningDataModule):
         labels = pd.read_parquet(os.path.join(self.root, stage, "labels.pq"))
         extra_features_files = {
             fn: {
-                "path" : os.path.join(self.root, stage, f_conf['file']),
-                "features" : f_conf["features_cols"]
+                "path": os.path.join(self.root, stage, f_conf["file"]),
+                "features": f_conf["features_cols"],
             }
-                for fn, f_conf in self.extra_features.items()
+            for fn, f_conf in self.extra_features.items()
         }
 
         # Filter
@@ -138,7 +132,6 @@ class SITSDataModule(L.LightningDataModule):
             classes=self.classes,
             augment=False,
             extra_features_files=extra_features_files,
-            chunk_size=self.chunk_size,
         )
 
     def setup(self, stage: str):
@@ -169,6 +162,7 @@ class SITSDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=True,
+            persistent_workers=True,
             drop_last=True,
             pin_memory=torch.cuda.is_available(),
         )
@@ -179,6 +173,7 @@ class SITSDataModule(L.LightningDataModule):
             self.val_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            persistent_workers=True,
             drop_last=True,
             pin_memory=torch.cuda.is_available(),
         )
