@@ -1,4 +1,3 @@
-import time
 from datetime import datetime
 from collections import defaultdict
 from datetime import datetime
@@ -104,7 +103,7 @@ class SITSDataset(IterableDataset):
         self.standardize = standardize
         self.augment = augment
 
-    def get_season_table(
+    def get_point(
         self, file: str, poi_id: str, season: int, cols: List[str]
     ) -> pd.DataFrame:
         """Retrieve row from parquet given a set of point ids
@@ -123,19 +122,7 @@ class SITSDataset(IterableDataset):
             df = pd.read_parquet(
                 f,
                 columns=cols,
-                filters=[
-                    (POINT_ID_COL, "=", poi_id),
-                    (
-                        DATE_COL,
-                        ">=",
-                        f"{season -1}-{self.start_month}-01",
-                    ),
-                    (
-                        DATE_COL,
-                        "<",
-                        f"{season }-{self.end_month}-01",
-                    ),
-                ],
+                filters=[(POINT_ID_COL, "=", poi_id)],
             )
         return df
 
@@ -222,11 +209,12 @@ class SITSDataset(IterableDataset):
             # Season filtering
             
             for season in self.labels[poi_id].keys():
-                start = time.now()
                 season_features_df = self.filter_season(features_df, season)
 
                 if len(season_features_df) < 5:
+                    raise ValueError(season_features_df.values)
                     continue
+
                 season_extra_features = { 
                         fn : self.filter_season(fdata['table'], season)[fdata['features']].values
                         for fn, fdata in extra_features_values.items()
@@ -265,5 +253,4 @@ class SITSDataset(IterableDataset):
                     key: torch.from_numpy(value) for key, value in output.items()
                 }
 
-                raise ValueError(time.now() - start)
                 yield tensor_output
