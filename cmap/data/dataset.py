@@ -1,5 +1,4 @@
-import gc
-import os
+from datetime import datetime
 from collections import defaultdict
 from datetime import datetime
 from typing import Dict, List
@@ -35,8 +34,6 @@ class SITSDataset(IterableDataset):
             their name and path for train and validation datasets.
             The dictionnary must have the following structure:
             {'temperatures' : {'path' : <fpath> , 'features_cols' : [<f1>, <f2>]}}
-        chunk_size (int) : Number of poi_id query and process at the same time in memory.
-            if -1, all the workers ids are considered (default : -1)
         start_month (int) : Starting season month for season - 1
         end_month (int) : Ending season month for season (can overlap with season + 1)
         max_n_positions (int) : Maximum number of positions sampled on time serie
@@ -52,7 +49,6 @@ class SITSDataset(IterableDataset):
         labels: pd.DataFrame,
         classes: List[str],
         extra_features_files: Dict[str, Dict[str, str | List[str]]] = {},
-        chunk_size: int = -1,
         ref_year: int = 2023,
         start_month: int = 11,
         end_month: int = 12,
@@ -71,8 +67,6 @@ class SITSDataset(IterableDataset):
                 files with their name and path for train and validation datasets.
                 The dictionnary must have the following structure:
                 {'temperatures' : {'path' : <fpath> , 'features_cols' : [<f1>, <f2>]}}
-            chunk_size (int) : Number of poi_id query and process at the same time in memory.
-                if -1, all the workers ids are considered (default : -1)
             ref_year (int): Year to compute number of maximum positions (default : 2023).
             start_month (int): Starting season month for season - 1 (default : 11)
             end_month (int): Ending season month for season (can overlap with season + 1) (default : 12)
@@ -106,7 +100,6 @@ class SITSDataset(IterableDataset):
         ) // n_steps
 
         # Processing
-        self.chunk_size = chunk_size
         self.standardize = standardize
         self.augment = augment
 
@@ -131,8 +124,16 @@ class SITSDataset(IterableDataset):
                 columns=cols,
                 filters=[
                     (POINT_ID_COL, "=", poi_id),
-                    (DATE_COL, ">=", f"{season -1}-{self.start_month}-01"),
-                    (DATE_COL, "<", f"{season }-{self.end_month}-01"),
+                    (
+                        DATE_COL,
+                        ">=",
+                        datetime.fromisoformat(f"{season -1}-{self.start_month}-01"),
+                    ),
+                    (
+                        DATE_COL,
+                        "<",
+                        datetime.fromisoformat(f"{season }-{self.end_month}-01"),
+                    ),
                 ],
             )
         return df
