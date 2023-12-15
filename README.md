@@ -65,3 +65,19 @@ modules `data` and `ml`
 ├── poetry.lock     # Poetry lock filee, source of truth
 └── pyproject.toml  # Poetry dependencies definitions
 ```
+
+## Useful Links
+
+- Papers :
+
+* [Vanilla Time Series transformer](https://openaccess.thecvf.com/content_CVPR_2020/papers/Garnot_Satellite_Image_Time_Series_Classification_With_Pixel-Set_Encoders_and_Temporal_CVPR_2020_paper.pdf)
+* [Temperature Encoding as position](https://ar5iv.labs.arxiv.org/html/2203.09175)
+* [Exchanger Architecture](https://ar5iv.labs.arxiv.org/html/2305.02086v2)
+
+- Code:
+
+* [Thermal Encoder](https://github.com/jnyborg/tpe/tree/main)
+* [Vanilla TS Transformer](https://github.com/VSainteuf/pytorch-psetae/tree/master)
+* [Exchanger](https://github.com/TotalVariation/Exchanger4SITS/tree/main/lib)
+* [Attention Patchinig](https://gist.github.com/airalcorn2/50ec06517ce96ecc143503e21fa6cb91)
+* [Transformers 101](https://uvadlc-notebooks.readthedocs.io/en/latest/tutorial_notebooks/tutorial6/Transformers_and_MHAttention.html)

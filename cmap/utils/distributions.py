@@ -5,6 +5,14 @@ import pandas as pd
 
 
 def get_dist_plot(labels: List[str]):
+    """Get distribution plots.
+
+    Args:
+        labels : Labels list
+
+    Returns:
+        Distribution plots
+    """
     labels_dist = pd.DataFrame(labels, columns=["label"]).value_counts()
     # Create a bar plot with adjusted bar width
     ax = labels_dist.plot.bar(
