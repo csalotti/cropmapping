@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 from collections import defaultdict
 from datetime import datetime
@@ -127,12 +128,12 @@ class SITSDataset(IterableDataset):
                     (
                         DATE_COL,
                         ">=",
-                        datetime.fromisoformat(f"{season -1}-{self.start_month}-01"),
+                        f"{season -1}-{self.start_month}-01",
                     ),
                     (
                         DATE_COL,
                         "<",
-                        datetime.fromisoformat(f"{season }-{self.end_month}-01"),
+                        f"{season }-{self.end_month}-01",
                     ),
                 ],
             )
@@ -204,25 +205,35 @@ class SITSDataset(IterableDataset):
         # If additionnal features are added, they will be included
         # in the loop
         for poi_id, features_df in features_df.groupby(POINT_ID_COL):
+            
+            extra_features_values = {}
+            for extra_id, extra_conf in self.extra_features_files.items():
+                fpath = extra_conf["path"]
+                features_cols = extra_conf["features"]
+                extra_features_values[extra_id] = { 
+                            "table" : self.get_table(
+                                fpath,
+                                [poi_id],
+                                cols=[POINT_ID_COL, DATE_COL] + features_cols,
+                            ),
+                            "features" : features_cols
+                        }
+
             # Season filtering
+            
             for season in self.labels[poi_id].keys():
+                start = time.now()
                 season_features_df = self.filter_season(features_df, season)
 
                 if len(season_features_df) < 5:
                     continue
+                season_extra_features = { 
+                        fn : self.filter_season(fdata['table'], season)[fdata['features']].values
+                        for fn, fdata in extra_features_values.items()
+                }
 
-                extra_features_values = {}
 
                 # Extra features season filtering
-                for extra_id, extra_conf in self.extra_features_files.items():
-                    fpath = extra_conf["path"]
-                    features_cols = extra_conf["features"]
-                    extra_features_values[extra_id] = self.get_season_table(
-                        fpath,
-                        poi_id,
-                        season,
-                        cols=[POINT_ID_COL, DATE_COL] + features_cols,
-                    )
 
                 ts = season_features_df[ALL_BANDS].values
                 dates = season_features_df[DATE_COL].dt.date.values
@@ -237,7 +248,7 @@ class SITSDataset(IterableDataset):
                     max_n_positions=self.max_n_positions,
                     standardize=self.standardize,
                     augment=self.augment,
-                    **extra_features_values,
+                    **season_extra_features,
                 )
 
                 # Convert to dicto of tensors
@@ -254,4 +265,5 @@ class SITSDataset(IterableDataset):
                     key: torch.from_numpy(value) for key, value in output.items()
                 }
 
+                raise ValueError(time.now() - start)
                 yield tensor_output

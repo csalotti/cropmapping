@@ -7,14 +7,14 @@ data:
   class_path: cmap.data.modules.SITSDataModule
   init_args:
     root: /mnt/sda/geowatch/datasets/hackathon/crop_mapping/fra_19_21
-    extra_features:
-      temperatures:
-        file: temperatures.pq
-        features_cols: 
-          - temperature
+      #extra_features:
+      #  temperatures:
+      #    file: temperatures.pq
+      #    features_cols: 
+      #      - temperature
     rpg_mapping_path: configs/rpg_codes.yml
-    num_workers: 20
-    batch_size: 256
+    num_workers: 1
+    batch_size: 3
     train_seasons:
       - 2019
       - 2020
