@@ -39,14 +39,14 @@ def get_temp_folder(s_filter, f):
 
 def get_features(s_filter, f):
     df = pd.read_csv(f, engine="pyarrow", index_col=0)
-    df[[POINT_ID_COL, 'chunk_id', 'aws_index']] = df[[POINT_ID_COL, 'chunk_id', 'aws_index']].astype('category')
+    df[['chunk_id', 'aws_index']] = df[['chunk_id', 'aws_index']].astype('category')
     df[ALL_BANDS] = df[ALL_BANDS].astype('uint16')
     df[DATE_COL] = pd.to_datetime(df[DATE_COL])
     return df.query(s_filter)
 
 def get_labels(s_filter, f):
     df = pd.read_csv(f, engine="pyarrow", index_col=0)
-    df[[POINT_ID_COL, SEASON_COL, LABEL_COL]] = df[[POINT_ID_COL, SEASON_COL, LABEL_COL]].astype('category')
+    df[[SEASON_COL, LABEL_COL]] = df[SEASON_COL, LABEL_COL]].astype('category')
     return df.query(s_filter)
 
 def merge_chunks(src, dst, dname, dfilter, dget, dcols, max_workers=2, chunksize=10):

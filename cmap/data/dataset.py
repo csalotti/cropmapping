@@ -29,6 +29,8 @@ class SITSDataset(IterableDataset):
             their name and path for train and validation datasets.
             The dictionnary must have the following structure:
             {'temperatures' : {'path' : <fpath> , 'features_cols' : [<f1>, <f2>]}}
+        chunk_size (int) : Number of poi_id query and process at the same time in memory.
+            if -1, all the workers ids are considered (default : -1)
         start_month (int) : Starting season month for season - 1
         end_month (int) : Ending season month for season (can overlap with season + 1)
         max_n_positions (int) : Maximum number of positions sampled on time serie
@@ -44,6 +46,7 @@ class SITSDataset(IterableDataset):
         labels: pd.DataFrame,
         classes: List[str],
         extra_features_files: Dict[str, Dict[str, str | List[str]]] = {},
+        chunk_size : int = -1,
         ref_year: int = 2023,
         start_month: int = 11,
         end_month: int = 12,
@@ -62,13 +65,15 @@ class SITSDataset(IterableDataset):
                 files with their name and path for train and validation datasets.
                 The dictionnary must have the following structure:
                 {'temperatures' : {'path' : <fpath> , 'features_cols' : [<f1>, <f2>]}}
-            ref_year (int): Year to compute number of maximum positions.
-            start_month (int): Starting season month for season - 1
-            end_month (int): Ending season month for season (can overlap with season + 1)
-            n_steps (int): Number of step for maximmum positions
+            chunk_size (int) : Number of poi_id query and process at the same time in memory.
+                if -1, all the workers ids are considered (default : -1)
+            ref_year (int): Year to compute number of maximum positions (default : 2023).
+            start_month (int): Starting season month for season - 1 (default : 11)
+            end_month (int): Ending season month for season (can overlap with season + 1) (default : 12)
+            n_steps (int): Number of step for maximmum positions (default : 5)
             standardize (bool): Flag for ts values standardization ( x - mean) / std,
-                otherwise, divide by 10_000
-            augment (bool): Add N(0,10-2) noise to each bands
+                otherwise, divide by 10_000 (default : False)
+            augment (bool): Add N(0,10-2) noise to each bands (default : False)
         """
         # Data
         self.features_file = features_file
@@ -95,6 +100,7 @@ class SITSDataset(IterableDataset):
         ) // n_steps
 
         # Processing
+        self.chunk_size = chunk_size
         self.standardize = standardize
         self.augment = augment
 
@@ -112,8 +118,6 @@ class SITSDataset(IterableDataset):
         """
         with open(file, "rb") as f:
             df = pd.read_parquet(f, columns=cols, filters=[(POINT_ID_COL, "in", poi_ids)])
-            df[DATE_COL] = pd.to_datetime(df[DATE_COL])
-            df = df.sort_values([POINT_ID_COL, DATE_COL])
         return df
 
     def filter_season(self, df: pd.DataFrame, season: int) -> pd.DataFrame:
@@ -153,15 +157,15 @@ class SITSDataset(IterableDataset):
         else:
             worker_poi_ids = list(self.labels.keys())
 
-        chunk_size = 100_000
+        chunk_size = len(worker_poi_ids) if self.chunk_size == -1 else self.chunk_size
         n_chunks = max(len(worker_poi_ids)//chunk_size, 1)
         for i in range(n_chunks):
             sub_poi_ids = worker_poi_ids[i*chunk_size:min((i+1)*chunk_size, len(worker_poi_ids))]
 
             # Workers features attribution
             worker_features_df = self.get_table(self.features_file, sub_poi_ids, cols=[POINT_ID_COL, DATE_COL] + ALL_BANDS)
-            iterator = [worker_features_df.groupby(POINT_ID_COL, observed=True)]
-
+            iterator = [worker_features_df.groupby(POINT_ID_COL, observed=True, sort=True)]
+            feat_len = worker_features_df[POINT_ID_COL].nunique()
             # Extra features augmentation
             extra_features= []
             for extra_id, extra_conf in self.extra_features_files.items():
@@ -169,7 +173,8 @@ class SITSDataset(IterableDataset):
                 features_cols = extra_conf['features']
                 extra_features.append({extra_id : features_cols})
                 worker_extra_df = self.get_table(fpath, sub_poi_ids, cols=[POINT_ID_COL, DATE_COL] + features_cols)
-                iterator.append(worker_extra_df.groupby(POINT_ID_COL, observed=True))
+                iterator.append(worker_extra_df.groupby(POINT_ID_COL, observed=True, sort=True))
+                extra_len = worker_extra_df[POINT_ID_COL].nunique()
 
             iterator = zip(*iterator) if len(extra_features) > 0 else iterator[0]
 
@@ -186,7 +191,6 @@ class SITSDataset(IterableDataset):
                     season_features_df = self.filter_season(features_df, season)
 
                     if len(season_features_df) < 5:
-                        raise ValueError(f"{poi_id}\n{season_df}")
                         continue
 
                     extra_features_values = {}
@@ -195,9 +199,11 @@ class SITSDataset(IterableDataset):
                     for i, ef in  enumerate(extra_features):
                         ef_name, ef_feat_cols = list(ef.items())[0]
                         if group_features[i + 1][0] != poi_id:
+
                             raise ValueError(
-                                f"{ef_name} and features don't match"
-                                + f"{group_features[i+1][0]} != {poi_id}"
+                                f"{ef_name} and features don't match "
+                                + f"{group_features[i+1][0]} != {poi_id} "
+                                + f"{feat_len} - {extra_len}"
                             )
                         extra_features_values[ef_name] = self.filter_season(
                             group_features[i + 1][1], season
