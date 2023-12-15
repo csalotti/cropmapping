@@ -1,10 +1,18 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
 import seaborn as sns
 
 
 def patch_attention(m):
+    """Patch attention in nn.TransofrmerEncoder
+    to return averaged attention maps
+
+    Args :
+        m (nn.TransformerEncoder) : model
+
+    """
     forward_orig = m.forward
 
     def wrap(*args, **kwargs):
@@ -28,6 +36,14 @@ class SaveAttentionMapHook:
 
 
 def merge(attn_maps_months):
+    """Merge Attention Maps by averaging per month
+
+    Args:
+        attn_maps_months (pd.DataFrame) : Attention maps
+
+    Returns:
+        attn_maps_months avergaed
+    """
     return (
         pd.concat(attn_maps_months)
         .groupby(["month", "layer", "target"], as_index=False)
@@ -35,7 +51,30 @@ def merge(attn_maps_months):
     )
 
 
-def resample(attention_map, days, masks, targets, ref_month=11, ref_year=2023):
+def resample(
+    attention_map: NDArray,
+    days: NDArray,
+    masks: NDArray,
+    targets: NDArray,
+    ref_month: int = 11,
+    ref_year: int = 2023,
+):
+    """Map attention maps from days to month to get a
+    behavior on a monthly manner.
+
+
+    Args:
+        attention_map (NDArray) : Attention maps
+        days (NDArray) : Time serie days
+        masks (NDArray) : days masking
+        targets (NDArray) : class
+        ref_month (int = 11) : reference month for season
+        ref_year (int = 2023) : reference year for season
+
+    Returns:
+        Merged attention maps on a average value per month on the
+        season.
+    """
     attn_maps_months = []
     for attn_maps, d, m, t in zip(attention_map, days, masks, targets):
         attn_maps = attn_maps[:, : m.sum(), : m.sum()].mean(axis=1)
@@ -73,7 +112,18 @@ def resample(attention_map, days, masks, targets, ref_month=11, ref_year=2023):
     return merge(attn_maps_months)
 
 
-def plot_attention(attn_maps_df, step_name: str, post_title: str = ""):
+def plot_attention(
+    attn_maps_df: pd.DataFrame,
+    step_name: str,
+    post_title: str = "",
+):
+    """Plot attention maps
+
+    Args:
+        attn_maps_df (pd.DataFrame) : Attention maps
+        step_name (str) : Name of the time step (e.g. month)
+        post_title (str = "") : Post title (e.g. class name)
+    """
     fig, ax = plt.subplots()
 
     for layer in attn_maps_df["layer"].unique():

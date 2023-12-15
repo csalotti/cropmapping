@@ -6,7 +6,16 @@ on 3 modules:
 
 1. `ml` : All operations, transformations and loops for training and validation.
    It defines the `LightningModule`, asystem to organize pytorch code into
-   sections (trainig ,validation, optoimizers, learning rates, ..) b. `Trainer`
+   sections (trainig ,validation, optoimizers, learning rates, ..)
+
+2. `data` : Define how the data prepared, fed to the a Dataset, split and
+   iterated through a `DataLoader`. It defines the `LightningDataModule` that
+   make training reproducible.
+
+3. `main` : Entry point of the training, it defines the `Trainer` that automate
+   training and validation loop, with a `LightningModule` and
+   `LightningDataModule`. For convenience and reproduciblity, it is launched
+   through `LightningCli` that can take yaml config files as input
 
 ## Structure
 
