@@ -17,23 +17,24 @@ COLS = {
 }
 
 
-def feat_season_filter(stage):
+def date_season_filter(stage):
     start = 2018 if stage == "train" else 2020
     end = 2020 if stage == "train" else 2021
     return f"({DATE_COL} >= '{start}-11-01') & ({DATE_COL} < '{end}-12-01')"
 
-def labels_season_filter(stage):
+def year_season_filter(stage):
     seasons = [2021] if stage == 'val' else [2020, 2019] 
     return f"{SEASON_COL} in {seasons}"
 
-def get_temp_folder(s_filter, f):
+def get_temp_folder(f):
     df = pd.read_csv(f, engine="pyarrow", index_col=0).rename(
         columns={"id_point": POINT_ID_COL}
     )
     if DATE_COL not in df.columns:
-        df[DATE_COL] = os.path.basename(f)[:-4]
+        df[DATE_COL] = pd.to_datetime(os.path.basename(f)[:-4])
     if "temperature" in df.columns:
         df["temperature"] -= 273.15
+        df["temperature"] = df["temperature"].astype('uint8')
     
     return df.query(s_filter)
 
@@ -62,13 +63,13 @@ def merge_chunks(src, dst, dname, dfilter, dget, dcols, max_workers=2, chunksize
 def convert_temps(src, dst, max_workers=2):
     for stage in ["train", "val"]:
         # Convert
-        s_filter = season_filter(stage) 
+        s_filter = date_season_filter(stage) 
         ids = range(80) if stage == "train" else range(80, 100)
         for i in tqdm(ids):
             files = glob(os.path.join(src , "temperatures", str(i), "*.csv"))
-            fn = partial(get_temp_folder, s_filter)
-            temp_data = process_map(fn, files,max_workers=max_workers, chunksize=10)
+            temp_data = process_map(get_temp_folder, files,max_workers=max_workers, chunksize=10)
             temps_df = pd.concat(temp_data, ignore_index=True).sort_values([POINT_ID_COL, DATE_COL])
+            temps_df = temps_df.query(s_filter)
             temps_df.to_parquet(os.path.join(dst, stage, "temperatures", f"{i}.pq"), index=False)
 
 def merge_temps(root):
