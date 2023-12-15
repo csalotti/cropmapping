@@ -212,7 +212,6 @@ class SITSDataset(IterableDataset):
                 season_features_df = self.filter_season(features_df, season)
 
                 if len(season_features_df) < 5:
-                    raise ValueError(season_features_df.values)
                     continue
 
                 season_extra_features = { 

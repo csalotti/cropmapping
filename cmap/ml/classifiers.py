@@ -63,6 +63,7 @@ class Classifier(L.LightningModule):
         self,
         encoder: nn.Module,
         decoder: nn.Module,
+        criterion: nn.Module,
         classes_weights: Optional[Dict[str, float]] = None,
         encoder_weights_path: str = "",
         classes: List[str] = DEFAULT_CLASSES,
@@ -105,7 +106,11 @@ class Classifier(L.LightningModule):
         self.wd = wd
 
         # Metrics
-        self.criterion = nn.CrossEntropyLoss(weight=self.classes_weights)
+        # self.criterion = nn.CrossEntropyLoss(weight=self.classes_weights)
+        self.criterion = criterion
+        self.criterion.register_buffer('weight', self.classes_weights)
+        self.criterion.weight = self.classes_weights
+
         self.train_f1 = MulticlassF1Score(num_classes=len(classes))
         self.val_f1 = MulticlassF1Score(num_classes=len(classes))
         self.train_conf_mat = MulticlassConfusionMatrix(

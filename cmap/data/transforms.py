@@ -81,7 +81,7 @@ def ts_transforms(
         ts (NDArray) : Bands data
         dates (NDArray) : time steps
         season (int) :  Current season
-        temperatures i(Optional[NDArray]) : Corresponding temperatures,
+        temperatures (Optional[NDArray]) : Corresponding temperatures,
         start_month (int) : Season start month (season -1)
         max_n_positions (int) : maximum number of positions
         standardize (bool) : standardization flag ,

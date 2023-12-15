@@ -6,7 +6,7 @@ import seaborn as sns
 
 
 def patch_attention(m):
-    """Patch attention in nn.TransofrmerEncoder
+    """Patch attention in nn.TransformerEncoder
     to return averaged attention maps
 
     Args :
