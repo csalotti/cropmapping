@@ -54,6 +54,11 @@ def labels_sample(
             lambda x: x.sample(frac=fraction)
         )
 
+    if fraction > 1.0:
+        labels = labels.groupby([LABEL_COL, SEASON_COL], group_keys=False).apply(
+            lambda x: x.sample(min(fraction, len(x)))
+        )
+
     return labels
 
 
@@ -111,7 +116,7 @@ def ts_transforms(
     if temperatures is not None:
         temperatures = np.cumsum(temperatures)
         temperatures = temperatures[days]
-    
+
     # Positions
     positions = temperatures if temperatures is not None else days
 

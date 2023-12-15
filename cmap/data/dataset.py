@@ -103,29 +103,6 @@ class SITSDataset(IterableDataset):
         self.standardize = standardize
         self.augment = augment
 
-    def get_point(
-        self, file: str, poi_id: str, season: int, cols: List[str]
-    ) -> pd.DataFrame:
-        """Retrieve row from parquet given a set of point ids
-
-        Args:
-            file (str): parquet file path
-            poi_id (str): Selected point id
-            season (int) : Selected season
-            cols (List[str]): Selected columns
-
-        Returns:
-            Dataframe with point ids data
-
-        """
-        with open(file, "rb") as f:
-            df = pd.read_parquet(
-                f,
-                columns=cols,
-                filters=[(POINT_ID_COL, "=", poi_id)],
-            )
-        return df
-
     def get_table(self, file: str, poi_ids: List[str], cols: List[str]) -> pd.DataFrame:
         """Retrieve row from parquet given a set of point ids
 
@@ -181,44 +158,51 @@ class SITSDataset(IterableDataset):
         else:
             worker_poi_ids = list(self.labels.keys())
 
+        iterator = []
         # Workers features attribution
         features_df = self.get_table(
             self.features_file,
             worker_poi_ids,
             cols=[POINT_ID_COL, DATE_COL] + ALL_BANDS,
         )
+        iterator.append(features_df.groupby(POINT_ID_COL))
+
+        extra_features = {}
+        for extra_id, extra_conf in self.extra_features_files.items():
+            fpath = extra_conf["path"]
+            features_cols = extra_conf["features"]
+            extra_features[extra_id] = features_cols
+            features_df = self.get_table(
+                fpath,
+                worker_poi_ids,
+                cols=[POINT_ID_COL, DATE_COL] + features_cols,
+            )
+        iterator.append(features_df.groupby(POINT_ID_COL))
 
         # Iteration through group per point id.
         # If additionnal features are added, they will be included
         # in the loop
-        for poi_id, features_df in features_df.groupby(POINT_ID_COL):
-            
-            extra_features_values = {}
-            for extra_id, extra_conf in self.extra_features_files.items():
-                fpath = extra_conf["path"]
-                features_cols = extra_conf["features"]
-                extra_features_values[extra_id] = { 
-                            "table" : self.get_table(
-                                fpath,
-                                [poi_id],
-                                cols=[POINT_ID_COL, DATE_COL] + features_cols,
-                            ),
-                            "features" : features_cols
-                        }
-
+        for group_it in iterator:
+            poi_id = group_it[0][0] if len(extra_features) > 0 else group_it[0]
+            features_df = group_it[0][1] if len(extra_features) > 0 else group_it[1]
             # Season filtering
-            
+            for i in range(1, len(extra_features) + 1):
+                if group_it[i][0] != poi_id:
+                    raise ValueError(
+                        "poi_id not correspondingg between extra_features and features_df "
+                        + f"{poi_id} != {group_it[0][i+1]}"
+                    )
+
             for season in self.labels[poi_id].keys():
                 season_features_df = self.filter_season(features_df, season)
 
                 if len(season_features_df) < 5:
                     continue
 
-                season_extra_features = { 
-                        fn : self.filter_season(fdata['table'], season)[fdata['features']].values
-                        for fn, fdata in extra_features_values.items()
+                season_extra_features = {
+                    fn: self.filter_season(group_it[i + 1][1], season)[cols].values
+                    for i, (fn, cols) in enumerate(extra_features.items())
                 }
-
 
                 # Extra features season filtering
 
