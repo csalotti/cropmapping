@@ -1,3 +1,13 @@
+# CMap
+
+`cmap` is based of
+[`pytorch-lightning`](https://lightning.ai/docs/pytorch/stable/) that is based
+on 3 modules:
+
+1. `ml` : All operations, transformations and loops for training and validation.
+   It defines the `LightningModule`, asystem to organize pytorch code into
+   sections (trainig ,validation, optoimizers, learning rates, ..) b. `Trainer`
+
 ## Structure
 
 ```bash
