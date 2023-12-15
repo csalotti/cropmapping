@@ -1,3 +1,4 @@
+import gc
 import os
 from collections import defaultdict
 from datetime import datetime
@@ -160,23 +161,29 @@ class SITSDataset(IterableDataset):
         chunk_size = len(worker_poi_ids) if self.chunk_size == -1 else self.chunk_size
         n_chunks = max(len(worker_poi_ids)//chunk_size, 1)
         for i in range(n_chunks):
+            iterator = []
             sub_poi_ids = worker_poi_ids[i*chunk_size:min((i+1)*chunk_size, len(worker_poi_ids))]
 
             # Workers features attribution
-            worker_features_df = self.get_table(self.features_file, sub_poi_ids, cols=[POINT_ID_COL, DATE_COL] + ALL_BANDS)
-            iterator = [worker_features_df.groupby(POINT_ID_COL, observed=True, sort=True)]
-            feat_len = worker_features_df[POINT_ID_COL].nunique()
+            features_df = self.get_table(self.features_file, sub_poi_ids, cols=[POINT_ID_COL, DATE_COL] + ALL_BANDS)
+            iterator = [features_df.groupby(POINT_ID_COL, observed=True, sort=True)]
+            
+
             # Extra features augmentation
             extra_features= []
             for extra_id, extra_conf in self.extra_features_files.items():
                 fpath = extra_conf['path']
                 features_cols = extra_conf['features']
                 extra_features.append({extra_id : features_cols})
-                worker_extra_df = self.get_table(fpath, sub_poi_ids, cols=[POINT_ID_COL, DATE_COL] + features_cols)
-                iterator.append(worker_extra_df.groupby(POINT_ID_COL, observed=True, sort=True))
-                extra_len = worker_extra_df[POINT_ID_COL].nunique()
+                features_df = self.get_table(fpath, sub_poi_ids, cols=[POINT_ID_COL, DATE_COL] + features_cols)
+                iterator.append(features_df.groupby(POINT_ID_COL, observed=True, sort=True))
 
             iterator = zip(*iterator) if len(extra_features) > 0 else iterator[0]
+       
+            # Free memory 
+            del features_df
+            gc.collect()
+            features_df = pd.DataFrame()
 
             # Iteration through group per point id.
             # If additionnal features are added, they will be included
@@ -203,7 +210,6 @@ class SITSDataset(IterableDataset):
                             raise ValueError(
                                 f"{ef_name} and features don't match "
                                 + f"{group_features[i+1][0]} != {poi_id} "
-                                + f"{feat_len} - {extra_len}"
                             )
                         extra_features_values[ef_name] = self.filter_season(
                             group_features[i + 1][1], season
@@ -242,3 +248,5 @@ class SITSDataset(IterableDataset):
                     }
 
                     yield tensor_output
+        del iterator
+        gc.collect()

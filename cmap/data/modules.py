@@ -168,7 +168,6 @@ class SITSDataModule(L.LightningDataModule):
             ds_shuffled,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            persistent_workers=True,
             shuffle=True,
             drop_last=True,
             pin_memory=torch.cuda.is_available(),
@@ -180,7 +179,6 @@ class SITSDataModule(L.LightningDataModule):
             self.val_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            persistent_workers=True,
             drop_last=True,
             pin_memory=torch.cuda.is_available(),
         )

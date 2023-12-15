@@ -47,7 +47,7 @@ def get_features(s_filter, f):
 
 def get_labels(s_filter, f):
     df = pd.read_csv(f, engine="pyarrow", index_col=0)
-    df[[SEASON_COL, LABEL_COL]] = df[SEASON_COL, LABEL_COL]].astype('category')
+    df[[SEASON_COL, LABEL_COL]] = df[[SEASON_COL, LABEL_COL]].astype('category')
     return df.query(s_filter)
 
 def merge_chunks(src, dst, dname, dfilter, dget, dcols, max_workers=2, chunksize=10):
